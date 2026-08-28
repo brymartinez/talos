@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { Database } from "@/src/db/sqlite";
 
 import { jobIdSchema, jobKindSchema, type CardId, type JobId, type JobKind } from "@/src/domain/types";
 

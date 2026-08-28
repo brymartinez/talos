@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { Database } from "@/src/db/sqlite";
 
 import type { AppConfig } from "@/src/config/env";
 import { syncGitHub } from "@/src/github/sync";

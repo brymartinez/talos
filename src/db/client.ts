@@ -1,9 +1,8 @@
 import { mkdirSync } from "node:fs";
 
-import { Database } from "bun:sqlite";
-
 import type { AppConfig } from "@/src/config/env";
 import { migrateDatabase } from "@/src/db/migrate";
+import { Database } from "@/src/db/sqlite";
 
 const databaseByPath = new Map<string, Database>();
 
@@ -26,7 +25,7 @@ export function getDatabase(config: AppConfig): Database {
   }
 
   ensureDataDirectories(config);
-  const database = new Database(config.paths.databaseFile, { create: true });
+  const database = new Database(config.paths.databaseFile);
   database.run("PRAGMA foreign_keys = ON");
   database.run("PRAGMA journal_mode = WAL");
   database.run("PRAGMA busy_timeout = 5000");

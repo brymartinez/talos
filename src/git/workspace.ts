@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
-import type { Database } from "bun:sqlite";
+import type { Database } from "@/src/db/sqlite";
 
 import type { AppConfig } from "@/src/config/env";
 import type { CardId } from "@/src/domain/types";

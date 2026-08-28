@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { Database } from "bun:sqlite";
+import type { Database } from "@/src/db/sqlite";
 
 type UserVersionRow = Readonly<{ user_version: number }>;
 

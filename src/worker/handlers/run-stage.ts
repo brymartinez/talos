@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import type { Database } from "bun:sqlite";
+import type { Database } from "@/src/db/sqlite";
 import { z } from "zod";
 
 import { ClaudeRunner } from "@/src/agents/claude";

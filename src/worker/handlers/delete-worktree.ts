@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { Database } from "@/src/db/sqlite";
 
 import type { CardId } from "@/src/domain/types";
 import { deleteCardWorkspace } from "@/src/git/workspace";

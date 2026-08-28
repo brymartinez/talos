@@ -13,7 +13,7 @@ import {
 import type { MatchReason } from "@/src/domain/types";
 import { GitHubClient, GitHubError } from "@/src/github/client";
 import { buildSourceQueries } from "@/src/github/queries";
-import type { Database } from "bun:sqlite";
+import type { Database } from "@/src/db/sqlite";
 
 const userSchema = z.object({ login: z.string() });
 const repositorySchema = z.object({

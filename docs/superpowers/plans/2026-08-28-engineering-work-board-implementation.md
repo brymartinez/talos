@@ -6,7 +6,7 @@
 
 **Architecture:** Bun starts a Next.js web process and a separate worker. Both use one SQLite database. The web process saves durable jobs, while the worker owns GitHub refreshes, Git worktrees, agent subprocesses, and log files.
 
-**Tech stack:** Bun, Next.js, React, TypeScript, `bun:sqlite`, Zod, dnd-kit, ESLint, GitHub REST and GraphQL APIs, Codex CLI, Claude Code CLI.
+**Tech stack:** Bun, Next.js, React, TypeScript, SQLite through `better-sqlite3`, Zod, dnd-kit, ESLint, GitHub REST and GraphQL APIs, Codex CLI, Claude Code CLI.
 
 **Validation rule:** ADR 0002 prohibits a test suite. Do not add test files, a test runner, test scripts, or test-only dependencies. Validate with lint, type checking, a production build, focused command-line smoke checks, and one manual end-to-end run.
 
@@ -425,27 +425,27 @@ git commit -m "feat: run durable workflow jobs"
 - Create: `src/services/board.ts`
 - Create: `src/services/cards.ts`
 
-- [ ] **Step 1: Add the board snapshot service**
+- [x] **Step 1: Add the board snapshot service**
 
 Return columns, ordered cards, counts, current refresh, active runs, saved needs-input questions, safe configuration summary, and available filters. Return an API log URL for each run with a log. Never return tokens, raw provider environment values, or unrestricted file paths.
 
-- [ ] **Step 2: Add sync and card update routes**
+- [x] **Step 2: Add sync and card update routes**
 
 Queue one refresh at a time. Save notes and the work-agent choice. Reject agent changes after Planning starts unless Planning failed and Retry will start a fresh session.
 
-- [ ] **Step 3: Add move and ordering routes**
+- [x] **Step 3: Add move and ordering routes**
 
 Validate workflow-specific destinations. Save a forward move and its stage job atomically. Reject manual moves to Done. Rebalance numeric positions when needed.
 
-- [ ] **Step 4: Add run, log, and worktree action routes**
+- [x] **Step 4: Add run, log, and worktree action routes**
 
 Retry the current stage, request cancellation, queue VS Code opening, and request guarded worktree deletion. Return clear conflict errors for active runs, unchanged notes after `needs_input`, or dirty deletion. Add a read-only log route that resolves the run ID through SQLite, verifies that the saved path sits under `APP_DATA_DIR/logs`, and streams plain text without returning the filesystem path.
 
-- [ ] **Step 5: Add consistent API errors**
+- [x] **Step 5: Add consistent API errors**
 
 Return a stable JSON error shape with a safe message, code, and optional field details. Log the full local cause without leaking the token to the browser.
 
-- [ ] **Step 6: Validate routes with direct HTTP requests**
+- [x] **Step 6: Validate routes with direct HTTP requests**
 
 Start the web process with a temporary database. Use `curl` to read the empty board, queue a sync without a token to confirm safe configuration blocking, and exercise invalid card IDs and invalid Done moves through seeded local rows.
 
