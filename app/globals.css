@@ -86,6 +86,42 @@ a {
   color: var(--muted);
 }
 
+.configuration-panel {
+  max-width: 760px;
+  margin: 10vh auto 0;
+  padding: 28px;
+  border: 1px solid color-mix(in srgb, var(--red), transparent 35%);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 28%);
+}
+
+.configuration-panel h2 {
+  margin: 8px 0;
+}
+
+.configuration-panel p:not(.eyebrow) {
+  color: var(--muted);
+}
+
+.configuration-panel ul {
+  display: grid;
+  gap: 10px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.configuration-panel li {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--background);
+}
+
+.configuration-panel code {
+  color: var(--orange);
+}
+
 @media (max-width: 720px) {
   .app-shell {
     padding: 18px;

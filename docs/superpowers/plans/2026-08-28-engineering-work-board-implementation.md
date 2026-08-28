@@ -168,11 +168,11 @@ git commit -m "chore: scaffold engineering work board"
 - Create: `src/db/repositories.ts`
 - Modify: `app/page.tsx`
 
-- [ ] **Step 1: Define configuration parsing**
+- [x] **Step 1: Define configuration parsing**
 
 Parse comma-separated lists, positive integers, `codex | claude`, and paths. Return all startup errors together. Keep the token server-only and redact it from errors.
 
-- [ ] **Step 2: Define domain values and transition rules**
+- [x] **Step 2: Define domain values and transition rules**
 
 Use string unions for card type, match reason, stage, job state, and run state. Export a function with this shape:
 
@@ -183,27 +183,27 @@ function canMoveCard(card: Card, destination: Stage): boolean;
 
 Reject manual moves to Done and moves while a run is queued or active.
 
-- [ ] **Step 3: Create the initial SQLite schema**
+- [x] **Step 3: Create the initial SQLite schema**
 
 Create tables for repositories, source items, match reasons, cards, workspaces, agent sessions, agent runs, run events, queue jobs, refresh runs, and refresh errors. Add foreign keys, uniqueness for source item identity, queue indexes, and stable numeric card positions.
 
-- [ ] **Step 4: Add database startup and migrations**
+- [x] **Step 4: Add database startup and migrations**
 
 Create `APP_DATA_DIR` folders with owner-only permissions. Open SQLite once per process. Enable `foreign_keys`, `journal_mode=WAL`, and a busy timeout. Apply `schema.sql` when `user_version` is `0`.
 
-- [ ] **Step 5: Add focused data access functions**
+- [x] **Step 5: Add focused data access functions**
 
 Keep SQL out of route handlers and worker handlers. Provide transaction helpers for refresh reconciliation, card moves plus queue insertion, manual ordering, run creation, and queue leasing.
 
-- [ ] **Step 6: Block both processes on invalid startup configuration**
+- [x] **Step 6: Block both processes on invalid startup configuration**
 
 Expose one configuration result that both entry points use. When configuration is invalid, render one blocking panel listing every safe error in the web process. The worker must print the same safe errors and exit before it opens the queue, leases a job, scans a repository, or starts a subprocess. Do not render the board or start work.
 
-- [ ] **Step 7: Run static validation and a database smoke command**
+- [x] **Step 7: Run static validation and a database smoke command**
 
 Run typecheck and lint. Run a short Bun command that points `APP_DATA_DIR` at a temporary folder, opens the database, applies migrations, prints the table names, and exits. Do not save this command as a test.
 
-- [ ] **Step 8: Commit storage and configuration**
+- [x] **Step 8: Commit storage and configuration**
 
 ```bash
 git add src/config src/domain src/db app/page.tsx
