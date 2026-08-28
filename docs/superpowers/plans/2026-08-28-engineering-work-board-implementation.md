@@ -310,7 +310,7 @@ git commit -m "feat: isolate card worktrees"
 - Create: `src/agents/prompts.ts`
 - Create: `src/agents/policy.ts`
 
-- [ ] **Step 1: Define the runner boundary**
+- [x] **Step 1: Define the runner boundary**
 
 Use this provider-neutral shape:
 
@@ -324,31 +324,31 @@ interface AgentRunner {
 
 Normalize text, command, progress, result, error, session ID, and completion events.
 
-- [ ] **Step 2: Add subprocess streaming and required log files**
+- [x] **Step 2: Add subprocess streaming and required log files**
 
 Write raw stdout and stderr to a per-run log under `APP_DATA_DIR/logs`. Open the log before starting the provider. If the log cannot open or any log write fails, stop the provider process and fail the run. Parse complete lines without losing malformed provider output. Track child process groups so Cancel stops the whole run.
 
-- [ ] **Step 3: Add stage prompts and structured results**
+- [x] **Step 3: Add stage prompts and structured results**
 
 Planning requests triage, blockers, a file-level plan, and suggested checks. Building requests changed files, commands, results, blockers, and a short PR title and description. Review requests findings, verdict, checks, and updated PR text.
 
-- [ ] **Step 4: Implement Codex start and resume**
+- [x] **Step 4: Implement Codex start and resume**
 
 Use `codex exec --json`, the card worktree, a stage sandbox, and prompt input over stdin. Persist the session ID from JSON events. Resume Building with `codex exec resume <session-id>`.
 
-- [ ] **Step 5: Implement Claude Code start and resume**
+- [x] **Step 5: Implement Claude Code start and resume**
 
 Use `claude --print --output-format stream-json`, a stage permission mode, and prompt input. Persist the session ID. Resume Building with `--resume <session-id>`.
 
-- [ ] **Step 6: Enforce stage policy**
+- [x] **Step 6: Enforce stage policy**
 
 Strip `GITHUB_TOKEN` and Git credential variables from the child environment. Put guarded `git` and `gh` wrappers first on `PATH`. Deny commit, push, tag, destructive reset and clean, GitHub writes, and other-worktree changes. Give Planning and Review read-only file permissions. Give Building write access only to its worktree.
 
-- [ ] **Step 7: Check post-run Git state**
+- [x] **Step 7: Check post-run Git state**
 
 Fail Planning or Review on any file change. Fail Building on HEAD, branch, tag, or remote-reference changes. Keep uncommitted file changes. Save the policy failure in the run summary.
 
-- [ ] **Step 8: Validate adapter parsing without live usage**
+- [x] **Step 8: Validate adapter parsing without live usage**
 
 Feed saved representative JSON lines through each parser using a one-off Bun command. Check normalized output in the terminal. Do not save fixtures as tests.
 
