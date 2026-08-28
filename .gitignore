@@ -1,0 +1,7 @@
+.DS_Store
+.env
+.env.local
+.next/
+node_modules/
+*.log
+.eng-work-board/

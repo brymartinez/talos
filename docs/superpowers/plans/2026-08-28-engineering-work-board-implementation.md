@@ -99,7 +99,7 @@
 - Create: `app/page.tsx`
 - Create: `app/globals.css`
 
-- [ ] **Step 1: Create the package definition**
+- [x] **Step 1: Create the package definition**
 
 Use Bun scripts:
 
@@ -119,23 +119,23 @@ Use Bun scripts:
 
 Add runtime packages for Next.js, React, Zod, dnd-kit, and Lucide icons. Add only TypeScript, ESLint, React type packages, and Next.js ESLint configuration as development packages. Do not add test packages.
 
-- [ ] **Step 2: Add strict TypeScript, Next.js, and ESLint configuration**
+- [x] **Step 2: Add strict TypeScript, Next.js, and ESLint configuration**
 
 Use `strict: true`, `noUncheckedIndexedAccess: true`, and the `@/*` alias. Keep Next.js server output compatible with Bun.
 
-- [ ] **Step 3: Add environment documentation and ignore rules**
+- [x] **Step 3: Add environment documentation and ignore rules**
 
 Copy every variable from the approved spec into `.env.example`. Ignore `.env`, `.next`, `node_modules`, and `.eng-work-board` data when a user places it inside the project.
 
-- [ ] **Step 4: Add the two-process launch scripts**
+- [x] **Step 4: Add the two-process launch scripts**
 
 Use `Bun.spawn` with argument arrays. Forward `SIGINT` and `SIGTERM` to both children. Exit non-zero when either child fails and stop the other child.
 
-- [ ] **Step 5: Add the first Dracula page shell**
+- [x] **Step 5: Add the first Dracula page shell**
 
 Create the root layout and global color tokens. The initial page can render a loading board shell, but it must not contain mock data.
 
-- [ ] **Step 6: Install dependencies and validate the scaffold**
+- [x] **Step 6: Install dependencies and validate the scaffold**
 
 Run:
 
@@ -148,7 +148,7 @@ bun run build
 
 Expected: all commands exit `0`.
 
-- [ ] **Step 7: Commit the scaffold**
+- [x] **Step 7: Commit the scaffold**
 
 ```bash
 git add package.json bun.lock tsconfig.json next-env.d.ts next.config.ts eslint.config.mjs .gitignore .env.example scripts app
