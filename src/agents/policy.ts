@@ -42,7 +42,11 @@ export function enforceStagePolicy(input: Readonly<{
   before: GitState;
   after: GitState;
 }>): void {
-  if (input.stage !== "building" && (input.after.head !== input.before.head || input.after.status.length > 0)) {
+  if (
+    input.stage !== "building" &&
+    (input.after.head !== input.before.head ||
+      input.after.worktreeFingerprint !== input.before.worktreeFingerprint)
+  ) {
     throw new Error(`${input.stage} must not change files or HEAD`);
   }
   if (input.stage === "building" && (input.after.head !== input.before.head || changedOutsideWorktree(input.before, input.after))) {

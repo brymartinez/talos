@@ -1,7 +1,7 @@
 export {};
 
 const children = [
-  Bun.spawn(["bun", "x", "next", "start"], {
+  Bun.spawn(["bun", "x", "next", "start", "-H", "127.0.0.1"], {
     stdin: "inherit",
     stdout: "inherit",
     stderr: "inherit",

@@ -67,6 +67,8 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000). `bun dev` starts both Next.js and the durable worker. Use **Sync GitHub** to refresh the board.
 
+The web server binds to `127.0.0.1`. It is not exposed to other devices on the local network.
+
 The normal flow is:
 
 1. Move a card from Backlog to Planning. The selected work agent triages it and writes a plan without editing files.

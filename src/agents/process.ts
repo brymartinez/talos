@@ -8,6 +8,15 @@ import type { AgentEvent } from "@/src/agents/types";
 
 const activeProcesses = new Map<string, ChildProcessWithoutNullStreams>();
 
+function terminateProcessTree(child: ChildProcessWithoutNullStreams): void {
+  if (!child.pid) return;
+  try {
+    process.kill(-child.pid, "SIGTERM");
+  } catch {
+    child.kill("SIGTERM");
+  }
+}
+
 export async function* streamAgentProcess(input: Readonly<{
   runId: string;
   command: string;
@@ -61,7 +70,7 @@ export async function* streamAgentProcess(input: Readonly<{
       }
     } catch (error) {
       failure.value = error instanceof Error ? error : new Error("Agent output failed");
-      child.kill("SIGTERM");
+      terminateProcessTree(child);
     } finally {
       openReaders -= 1;
       notify();
@@ -69,7 +78,7 @@ export async function* streamAgentProcess(input: Readonly<{
   };
   log.on("error", (error) => {
     failure.value = error;
-    child.kill("SIGTERM");
+    terminateProcessTree(child);
     notify();
   });
   void read(child.stdout, "stdout");
@@ -104,10 +113,10 @@ export async function* streamAgentProcess(input: Readonly<{
 }
 
 export async function cancelAgentProcess(runId: string): Promise<void> {
-  const process = activeProcesses.get(runId);
-  if (!process?.pid) return;
+  const child = activeProcesses.get(runId);
+  if (!child?.pid) return;
   try {
-    process.kill("SIGTERM");
+    terminateProcessTree(child);
   } finally {
     activeProcesses.delete(runId);
   }

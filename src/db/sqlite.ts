@@ -8,7 +8,15 @@ export type Statement<Result, Parameters extends readonly unknown[]> = Readonly<
   run(...parameters: Parameters): RunResult;
 }>;
 
-export class Database {
+export interface Database {
+  query<Result, Parameters extends readonly unknown[]>(sql: string): Statement<Result, Parameters>;
+  run(sql: string): RunResult;
+  exec(sql: string): void;
+  transaction<Result>(operation: () => Result): () => Result;
+  close(): void;
+}
+
+export class NodeDatabase implements Database {
   readonly #database: BetterSqlite3.Database;
 
   constructor(path: string) {

@@ -24,6 +24,9 @@ export function BoardClient() {
   const router = useRouter();
   const repository = params.get("repository") ?? "";
   const query = params.get("query") ?? "";
+  const itemType = params.get("type") ?? "";
+  const reason = params.get("reason") ?? "";
+  const status = params.get("status") ?? "";
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
   const refresh = useCallback(async () => {
     try { setBoard(await readBoard()); setError(""); } catch (reason) { setError(reason instanceof Error ? reason.message : "Board could not load"); }
@@ -35,7 +38,13 @@ export function BoardClient() {
   }, []);
   const active = board?.refresh?.status === "running" || board?.cards.some((card) => ["queued", "running"].includes(card.runs[0]?.status ?? ""));
   useEffect(() => { if (!active) return; const timer = window.setInterval(() => void refresh(), 2_000); return () => window.clearInterval(timer); }, [active, refresh]);
-  const visible = useMemo(() => board?.cards.filter((card) => (!repository || card.repository === repository) && (!query || `${card.title} ${card.repository}`.toLowerCase().includes(query.toLowerCase()))) ?? [], [board, query, repository]);
+  const visible = useMemo(() => board?.cards.filter((card) =>
+    (!repository || card.repository === repository) &&
+    (!itemType || card.itemType === itemType) &&
+    (!reason || card.matchReasons.includes(reason)) &&
+    (!status || card.runs[0]?.status === status) &&
+    (!query || `${card.title} ${card.repository}`.toLowerCase().includes(query.toLowerCase())),
+  ) ?? [], [board, itemType, query, reason, repository, status]);
   const repositories = useMemo(() => [...new Set(board?.cards.map((card) => card.repository) ?? [])].sort(), [board]);
   const setFilter = (name: string, value: string): void => { const next = new URLSearchParams(params); if (value) next.set(name, value); else next.delete(name); router.replace(`?${next.toString()}`); };
   const request = async (url: string, body?: unknown): Promise<void> => {
@@ -59,7 +68,7 @@ export function BoardClient() {
   const selected = board.cards.find((card) => card.id === selectedId) ?? null;
   return (
     <>
-      <FilterBar repositories={repositories} repository={repository} query={query} busy={board.refresh?.status === "running"} onRepository={(value) => setFilter("repository", value)} onQuery={(value) => setFilter("query", value)} onSync={() => void request("/api/sync").catch((reason: Error) => setError(reason.message))} />
+      <FilterBar repositories={repositories} repository={repository} query={query} itemType={itemType} reason={reason} status={status} busy={board.refresh?.status === "running"} onFilter={setFilter} onSync={() => void request("/api/sync").catch((reason: Error) => setError(reason.message))} />
       <div className="board-summary"><span>{board.config.organization}</span><span>{visible.length} open items</span><span>Agent limit {board.config.concurrency}</span>{board.refresh?.finishedAt ? <span>Updated {new Date(board.refresh.finishedAt).toLocaleTimeString()}</span> : <span>Not synced yet</span>}</div>
       {error ? <p className="board-error" role="alert">{error}</p> : null}
       {board.refresh?.errors.length ? <details className="refresh-errors"><summary>{board.refresh.errors.length} refresh warnings</summary><ul>{board.refresh.errors.map((item) => <li key={`${item.scope}-${item.code}`}>{item.scope}: {item.message}</li>)}</ul></details> : null}

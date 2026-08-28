@@ -48,9 +48,9 @@ export function updateCard(database: Database, rawCardId: string, input: unknown
     throw new ServiceError("agent_locked", "The work agent can only change before Planning starts.", 409);
   }
   const timestamp = new Date().toISOString();
-  database.query<unknown, [string, string, "codex" | "claude", string, CardId]>(
+  database.query<unknown, [string, string | null, "codex" | "claude", string, CardId]>(
     `UPDATE cards SET notes = ?, notes_updated_at = ?, work_agent = ?, updated_at = ? WHERE id = ?`,
-  ).run(values.notes ?? card.notes, values.notes !== undefined ? timestamp : card.notesUpdatedAt ?? timestamp, values.workAgent ?? card.workAgent, timestamp, cardId);
+  ).run(values.notes ?? card.notes, values.notes !== undefined ? timestamp : card.notesUpdatedAt, values.workAgent ?? card.workAgent, timestamp, cardId);
 }
 
 export function moveCard(database: Database, rawCardId: string, input: unknown): void {
@@ -101,9 +101,21 @@ export function retryCard(database: Database, rawCardId: string): void {
 
 export function cancelCard(database: Database, rawCardId: string): void {
   const cardId = cardIdSchema.parse(rawCardId);
-  const changed = database.query<unknown, [string, CardId]>(
-    "UPDATE queue_jobs SET cancel_requested = 1, updated_at = ? WHERE card_id = ? AND state IN ('pending', 'leased')",
-  ).run(new Date().toISOString(), cardId).changes;
+  const timestamp = new Date().toISOString();
+  const changed = database.transaction(() => {
+    const pending = database.query<unknown, [string, CardId]>(
+      "UPDATE queue_jobs SET state = 'cancelled', updated_at = ? WHERE card_id = ? AND state = 'pending'",
+    ).run(timestamp, cardId).changes;
+    if (pending) {
+      database.query<unknown, [string, string, CardId]>(
+        "UPDATE agent_runs SET status = 'cancelled', finished_at = ?, updated_at = ? WHERE card_id = ? AND status = 'queued'",
+      ).run(timestamp, timestamp, cardId);
+    }
+    const leased = database.query<unknown, [string, CardId]>(
+      "UPDATE queue_jobs SET cancel_requested = 1, updated_at = ? WHERE card_id = ? AND state = 'leased'",
+    ).run(timestamp, cardId).changes;
+    return pending + leased;
+  })();
   if (!changed) throw new ServiceError("nothing_to_cancel", "This card has no queued or running work.", 409);
 }
 

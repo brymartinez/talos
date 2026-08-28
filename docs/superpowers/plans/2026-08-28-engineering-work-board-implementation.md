@@ -6,7 +6,7 @@
 
 **Architecture:** Bun starts a Next.js web process and a separate worker. Both use one SQLite database. The web process saves durable jobs, while the worker owns GitHub refreshes, Git worktrees, agent subprocesses, and log files.
 
-**Tech stack:** Bun, Next.js, React, TypeScript, SQLite through `better-sqlite3`, Zod, dnd-kit, ESLint, GitHub REST and GraphQL APIs, Codex CLI, Claude Code CLI.
+**Tech stack:** Bun, Next.js, React, TypeScript, SQLite through `better-sqlite3` in Next.js and `bun:sqlite` in the worker, Zod, dnd-kit, ESLint, GitHub REST and GraphQL APIs, Codex CLI, Claude Code CLI.
 
 **Validation rule:** ADR 0002 prohibits a test suite. Do not add test files, a test runner, test scripts, or test-only dependencies. Validate with lint, type checking, a production build, focused command-line smoke checks, and one manual end-to-end run.
 

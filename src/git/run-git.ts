@@ -9,6 +9,7 @@ export async function runGit(input: Readonly<{
   cwd?: string;
   signal?: AbortSignal;
   allowFailure?: boolean;
+  preserveWhitespace?: boolean;
 }>): Promise<GitResult> {
   const gitExecutable = Bun.which("git");
   if (!gitExecutable) {
@@ -25,7 +26,11 @@ export async function runGit(input: Readonly<{
     new Response(process.stderr).text(),
     process.exited,
   ]);
-  const result = { stdout: stdout.trim(), stderr: stderr.trim(), exitCode };
+  const result = {
+    stdout: input.preserveWhitespace ? stdout : stdout.trim(),
+    stderr: stderr.trim(),
+    exitCode,
+  };
   if (exitCode !== 0 && !input.allowFailure) {
     throw new Error(`git ${input.args[0] ?? "command"} failed: ${result.stderr || result.stdout}`);
   }

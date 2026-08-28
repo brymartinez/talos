@@ -69,6 +69,11 @@ export async function handleRunStage(input: Readonly<{
   }
   const provider = stage === "review" ? (context.work_agent === "codex" ? "claude" : "codex") : context.work_agent;
   const selectedRunner = runner(agentProviderSchema.parse(provider));
+  const priorResult = input.database.query<{ result_json: string | null }, [typeof cardId, typeof runId]>(
+    `SELECT result_json FROM agent_runs
+     WHERE card_id = ? AND id <> ? AND result_json IS NOT NULL
+     ORDER BY created_at DESC LIMIT 1`,
+  ).get(cardId, runId)?.result_json ?? undefined;
   const timestamp = new Date().toISOString();
   const priorSession = stage === "building"
     ? input.database.query<PriorSessionRow, [typeof cardId, AgentProvider]>(
@@ -92,7 +97,13 @@ export async function handleRunStage(input: Readonly<{
   input.database.query<unknown, [string, AgentProvider, string, string, typeof runId]>(
     "UPDATE agent_runs SET session_id = ?, provider = ?, status = 'running', started_at = ?, updated_at = ? WHERE id = ?",
   ).run(sessionId, provider, timestamp, timestamp, runId);
-  const prompt = stagePrompt({ stage, title: context.title, body: context.body, notes: context.notes });
+  const prompt = stagePrompt({
+    stage,
+    title: context.title,
+    body: context.body,
+    notes: context.notes,
+    priorResult,
+  });
   const before = await captureGitState(workspace.worktree_path);
   let result: AgentResult | null = null;
   let providerSessionId: string | null = null;

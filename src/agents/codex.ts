@@ -34,7 +34,7 @@ export class CodexRunner implements AgentRunner {
     const command = Bun.which("codex");
     if (!command) throw new Error("Codex CLI is not installed");
     const args = sessionId
-      ? ["exec", "resume", "--json", sessionId, "-"]
+      ? ["exec", "resume", "--json", "-c", `sandbox_mode=\"${policy.sandbox}\"`, sessionId, "-"]
       : ["exec", "--json", "--sandbox", policy.sandbox, "-C", input.cwd, "-"];
     yield* streamAgentProcess({ ...input, command, args, environment: policy.environment, parseLine: parseCodexLine });
   }

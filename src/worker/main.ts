@@ -1,6 +1,6 @@
 import { getConfigResult } from "@/src/config/env";
 import { cancelAgentProcess } from "@/src/agents/process";
-import { closeDatabases, getDatabase } from "@/src/db/client";
+import { closeBunDatabases, getBunDatabase } from "@/src/db/client-bun";
 import { cardIdSchema } from "@/src/domain/types";
 import { handleDeleteWorktree } from "@/src/worker/handlers/delete-worktree";
 import { handleOpenVsCode } from "@/src/worker/handlers/open-vscode";
@@ -14,7 +14,7 @@ if (!configuration.ok) {
   process.exit(1);
 }
 const config = configuration.config;
-const database = getDatabase(config);
+const database = getBunDatabase(config);
 const workerId = crypto.randomUUID();
 let stopping = false;
 const activeRunIds = new Set<string>();
@@ -82,5 +82,5 @@ while (!stopping) {
     }
   }));
 }
-closeDatabases();
+closeBunDatabases();
 console.log("Engineering Work Board worker stopped");
