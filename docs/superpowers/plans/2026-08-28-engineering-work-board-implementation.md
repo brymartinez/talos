@@ -219,33 +219,35 @@ git commit -m "feat: add durable board storage"
 - Modify: `src/db/repositories.ts`
 - Modify: `src/domain/types.ts`
 
-- [ ] **Step 1: Build the authenticated GitHub client**
+- [x] **Step 1: Build the authenticated GitHub client**
 
 Use native `fetch`. Add the current GitHub API version header, pagination, GraphQL error handling, rate-limit details, and token redaction. Expose typed `rest` and `graphql` helpers.
 
-- [ ] **Step 2: Resolve the sync scope**
+- [x] **Step 2: Resolve the sync scope**
 
 Read the authenticated username, organization repositories, optional extra repositories, exclusions, and user teams. Filter discovered teams by the optional allowlist.
 
-- [ ] **Step 3: Build exact source queries**
+- [x] **Step 3: Build exact source queries**
 
 Query assigned issues, assigned PRs, authored PRs, direct review requests, and team review requests. Query actual mentions within the configured date window. Do not use `involves` for mentions.
 
-- [ ] **Step 4: Normalize and deduplicate source items**
+- [x] **Step 4: Normalize and deduplicate source items**
 
 Normalize one source item by `owner/repository` plus GitHub number. Merge match reasons. Record PR author, assignees, review requests, head and base details, state, merged state, labels, body, URL, and timestamps.
 
-- [ ] **Step 5: Reconcile one refresh transaction**
+- [x] **Step 5: Reconcile one refresh transaction**
 
 Insert new cards at the top of Backlog. Archive stale Backlog cards. Mark active stale cards as no longer assigned. Fetch the current state for tracked items missing from the open result set and move closed or merged cards to Done.
 
-- [ ] **Step 6: Preserve partial results**
+- [x] **Step 6: Preserve partial results**
 
 Record each repository or query failure. Commit successful scope results and keep prior data for failed scope entries.
 
 - [ ] **Step 7: Validate with a read-only GitHub smoke command**
 
 With a configured token, print the authenticated login, scoped repository count, and source-item counts by match reason. Do not write to GitHub or SQLite in this first smoke command.
+
+Pending local credentials. Query generation was smoke-checked without GitHub access.
 
 - [ ] **Step 8: Commit GitHub sync**
 
