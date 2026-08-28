@@ -249,7 +249,7 @@ With a configured token, print the authenticated login, scoped repository count,
 
 Pending local credentials. Query generation was smoke-checked without GitHub access.
 
-- [ ] **Step 8: Commit GitHub sync**
+- [x] **Step 8: Commit GitHub sync**
 
 ```bash
 git add src/github src/db/repositories.ts src/domain/types.ts
@@ -293,7 +293,7 @@ Delete only the workspace row's exact path. Refuse dirty worktrees unless the AP
 
 Create temporary bare and working repositories with shell commands. Run repository matching, worktree creation, state capture, and clean deletion. Remove only the exact temporary directory after the smoke check.
 
-- [ ] **Step 8: Commit Git workspace handling**
+- [x] **Step 8: Commit Git workspace handling**
 
 ```bash
 git add src/git src/db/repositories.ts
@@ -352,7 +352,7 @@ Fail Planning or Review on any file change. Fail Building on HEAD, branch, tag, 
 
 Feed saved representative JSON lines through each parser using a one-off Bun command. Check normalized output in the terminal. Do not save fixtures as tests.
 
-- [ ] **Step 9: Commit agent adapters**
+- [x] **Step 9: Commit agent adapters**
 
 ```bash
 git add src/agents
@@ -402,7 +402,7 @@ Stop leasing new work, cancel lease renewal, wait briefly for active database wr
 
 Start the worker against a temporary app-data directory. Confirm migration, startup recovery, idle polling, and signal shutdown in the terminal.
 
-- [ ] **Step 9: Commit the worker**
+- [x] **Step 9: Commit the worker**
 
 ```bash
 git add src/worker src/db/repositories.ts
@@ -449,7 +449,7 @@ Return a stable JSON error shape with a safe message, code, and optional field d
 
 Start the web process with a temporary database. Use `curl` to read the empty board, queue a sync without a token to confirm safe configuration blocking, and exercise invalid card IDs and invalid Done moves through seeded local rows.
 
-- [ ] **Step 7: Commit the API**
+- [x] **Step 7: Commit the API**
 
 ```bash
 git add app/api src/services
@@ -496,7 +496,7 @@ Show optimistic ordering only. For stage moves, wait for the transactional API r
 
 Check filters, drawer focus, keyboard drag, horizontal scrolling, Retry and Cancel visibility, and readable status without relying only on color. Use local seeded rows and do not add browser tests.
 
-- [ ] **Step 8: Commit the interface**
+- [x] **Step 8: Commit the interface**
 
 ```bash
 git add app src/components
@@ -510,11 +510,11 @@ git commit -m "feat: add Dracula workflow board"
 - Modify: `.env.example`
 - Modify: `docs/superpowers/plans/2026-08-28-engineering-work-board-implementation.md`
 
-- [ ] **Step 1: Write the local setup guide**
+- [x] **Step 1: Write the local setup guide**
 
 Document Bun install expectations, `.env` setup, GitHub token permissions, Codex and Claude Code sign-ins, `code` command setup, `bun dev`, data paths, logs, and safe worktree cleanup.
 
-- [ ] **Step 2: Run all static validation**
+- [x] **Step 2: Run all static validation**
 
 ```bash
 bun run lint
@@ -524,7 +524,7 @@ bun run build
 
 Expected: all commands exit `0`.
 
-- [ ] **Step 3: Run focused local smoke checks**
+- [x] **Step 3: Run focused local smoke checks**
 
 Use a temporary `APP_DATA_DIR`. Confirm startup migration, empty board API, worker idle loop, safe shutdown, and VS Code command validation. Confirm no test files, test scripts, test runner, or test-only dependencies exist.
 
@@ -532,15 +532,17 @@ Use a temporary `APP_DATA_DIR`. Confirm startup migration, empty board API, work
 
 Follow the twelve outcomes in the approved design. Stop and report any outcome that cannot be checked because credentials, repository access, or live agent usage is unavailable.
 
-- [ ] **Step 5: Inspect safety boundaries**
+Pending local GitHub credentials and live agent usage approval.
+
+- [x] **Step 5: Inspect safety boundaries**
 
 Confirm agent child environments omit `GITHUB_TOKEN`. Confirm invalid Done moves fail. Confirm Building leaves HEAD unchanged. Confirm Review cannot edit. Confirm worktree deletion rejects dirty state without explicit confirmation.
 
-- [ ] **Step 6: Review the final diff and mark completed plan items**
+- [x] **Step 6: Review the final diff and mark completed plan items**
 
 Run `git diff --check`, inspect the branch diff against `main`, and update this plan's checkboxes to match completed work.
 
-- [ ] **Step 7: Commit the handoff**
+- [x] **Step 7: Commit the handoff**
 
 ```bash
 git add README.md .env.example docs/superpowers/plans/2026-08-28-engineering-work-board-implementation.md

@@ -146,11 +146,6 @@ export async function handleRunStage(input: Readonly<{
     input.database.query<unknown, [string, string, typeof cardId]>(
       "UPDATE workspaces SET after_state_json = ?, updated_at = ? WHERE card_id = ?",
     ).run(JSON.stringify(after), finished, cardId);
-    if (stage === "review" && status === "succeeded") {
-      input.database.query<unknown, [string, typeof cardId]>(
-        "UPDATE cards SET stage = 'done', updated_at = ? WHERE id = ?",
-      ).run(finished, cardId);
-    }
   })();
   if (status === "failed") throw new Error("Agent did not return a valid structured result");
 }
