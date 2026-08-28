@@ -468,31 +468,31 @@ git commit -m "feat: expose board workflow API"
 - Create: `src/components/card/CardDrawer.tsx`
 - Create: `src/components/ui/StatusBadge.tsx`
 
-- [ ] **Step 1: Build the full-width board shell**
+- [x] **Step 1: Build the full-width board shell**
 
 Render Backlog, Planning, Building, Review, and Done with horizontal overflow. Poll every two seconds only while a refresh or agent run is active. Add clear empty, loading, and startup-error states.
 
-- [ ] **Step 2: Build filters and manual sync**
+- [x] **Step 2: Build filters and manual sync**
 
 Add organization or repository, item type, match reason, and agent status filters. Keep filters in the URL. Show last refresh, partial errors, and Sync GitHub progress.
 
-- [ ] **Step 3: Add sortable cards and columns**
+- [x] **Step 3: Add sortable cards and columns**
 
 Use dnd-kit for pointer and keyboard drag. Persist same-column order. Allow only workflow-valid forward and backward destinations. Do not make Done a manual drop target. Lock active cards.
 
-- [ ] **Step 4: Add compact card content**
+- [x] **Step 4: Add compact card content**
 
 Show title, repository and number, item type, match reasons, work agent, and run status. Use accessible text with Dracula colors rather than color alone.
 
-- [ ] **Step 5: Build the detail drawer**
+- [x] **Step 5: Build the detail drawer**
 
 Add the GitHub link, editable notes, pre-Planning agent choice, plan, changed files, check results, review findings, PR title and description, run history, log links, Retry, Cancel, Open in VS Code, and guarded worktree deletion.
 
-- [ ] **Step 6: Add user feedback and error recovery**
+- [x] **Step 6: Add user feedback and error recovery**
 
 Show optimistic ordering only. For stage moves, wait for the transactional API result before showing success. Restore the card when a request fails and show the safe API message.
 
-- [ ] **Step 7: Run keyboard and browser checks**
+- [x] **Step 7: Run keyboard and browser checks**
 
 Check filters, drawer focus, keyboard drag, horizontal scrolling, Retry and Cancel visibility, and readable status without relying only on color. Use local seeded rows and do not add browser tests.
 

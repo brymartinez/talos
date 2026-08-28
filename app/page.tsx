@@ -1,4 +1,7 @@
+import { Suspense } from "react";
+
 import { getConfigResult } from "@/src/config/env";
+import { BoardClient } from "@/src/components/board/BoardClient";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +17,9 @@ export default function HomePage() {
         </div>
       </header>
       {configuration.ok ? (
-        <section className="loading-panel" aria-live="polite">
-          <p>Loading your board...</p>
-        </section>
+        <Suspense fallback={<section className="loading-panel"><p>Loading your board...</p></section>}>
+          <BoardClient />
+        </Suspense>
       ) : (
         <section className="configuration-panel" aria-labelledby="configuration-title">
           <p className="eyebrow">Setup required</p>
