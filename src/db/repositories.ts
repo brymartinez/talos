@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { z } from "zod";
 
 import {
   cardIdSchema,
@@ -100,6 +101,66 @@ export function parseStoredCardId(value: string): CardId {
 
 export function parseStoredJobId(value: string): JobId {
   return jobIdSchema.parse(value);
+}
+
+export type CardWorkSource = Readonly<{
+  cardId: CardId;
+  repositoryId: string;
+  repositoryName: string;
+  cloneUrl: string;
+  localClonePath: string | null;
+  defaultBranch: string;
+  itemType: ItemType;
+  githubNumber: number;
+  title: string;
+  headRef: string | null;
+  headRepository: string | null;
+  matchReasons: readonly string[];
+}>;
+
+type CardWorkSourceRow = Omit<CardWorkSource, "cardId" | "matchReasons"> &
+  Readonly<{ cardId: string; matchReasonsJson: string }>;
+
+export function getCardWorkSource(database: Database, cardId: CardId): CardWorkSource {
+  const row = database
+    .query<CardWorkSourceRow, [CardId]>(
+      `SELECT
+        cards.id AS cardId,
+        repositories.id AS repositoryId,
+        repositories.full_name AS repositoryName,
+        repositories.clone_url AS cloneUrl,
+        repositories.local_clone_path AS localClonePath,
+        repositories.default_branch AS defaultBranch,
+        source_items.item_type AS itemType,
+        source_items.github_number AS githubNumber,
+        source_items.title,
+        source_items.head_ref AS headRef,
+        source_items.head_repository AS headRepository,
+        COALESCE((
+          SELECT json_group_array(reason)
+          FROM match_reasons
+          WHERE source_item_id = source_items.id
+        ), '[]') AS matchReasonsJson
+      FROM cards
+      JOIN source_items ON source_items.id = cards.source_item_id
+      JOIN repositories ON repositories.id = source_items.repository_id
+      WHERE cards.id = ?`,
+    )
+    .get(cardId);
+  if (!row) throw new Error(`Card ${cardId} does not exist`);
+  return {
+    ...row,
+    cardId: cardIdSchema.parse(row.cardId),
+    matchReasons: z.array(z.string()).parse(JSON.parse(row.matchReasonsJson)),
+  };
+}
+
+export function saveRepositoryPath(database: Database, repositoryId: string, path: string): void {
+  database
+    .query<unknown, [string, string, string]>(
+      "UPDATE repositories SET local_clone_path = ?, updated_at = ? WHERE id = ?",
+    )
+    .run(path, now(), repositoryId);
 }
 
 export type ReconciledRepository = Readonly<{

@@ -265,31 +265,31 @@ git commit -m "feat: sync personal GitHub work"
 - Create: `src/git/state.ts`
 - Modify: `src/db/repositories.ts`
 
-- [ ] **Step 1: Add a safe Git subprocess helper**
+- [x] **Step 1: Add a safe Git subprocess helper**
 
 Pass Git arguments as an array. Capture stdout, stderr, exit code, and cancellation. Never interpolate repository names or paths into a shell command.
 
-- [ ] **Step 2: Scan configured repository roots**
+- [x] **Step 2: Scan configured repository roots**
 
 Walk directories with a bounded depth and skip dependencies, build output, hidden app data, and existing worktrees. Read each repository's `origin` URL and normalize SSH and HTTPS GitHub URLs to the same identity.
 
-- [ ] **Step 3: Resolve or clone a repository**
+- [x] **Step 3: Resolve or clone a repository**
 
 Reuse a matching local clone. Otherwise clone into `APP_DATA_DIR/repos/<owner>/<repository>`. Serialize clone and fetch operations per repository.
 
-- [ ] **Step 4: Create one card worktree**
+- [x] **Step 4: Create one card worktree**
 
 Use the default branch for issues and the PR head for authored or assigned PRs. Use a detached, read-only checkout for review-only PRs. Create full-workflow branches with the `codex/` prefix and a stable card-derived name.
 
-- [ ] **Step 5: Capture before and after Git state**
+- [x] **Step 5: Capture before and after Git state**
 
 Record HEAD, porcelain status, local branches, tags, and configured remote references. Provide comparison functions used by agent policy checks.
 
-- [ ] **Step 6: Add guarded worktree deletion**
+- [x] **Step 6: Add guarded worktree deletion**
 
 Delete only the workspace row's exact path. Refuse dirty worktrees unless the API receives explicit confirmation. Never use a broad recursive target.
 
-- [ ] **Step 7: Validate against temporary local repositories**
+- [x] **Step 7: Validate against temporary local repositories**
 
 Create temporary bare and working repositories with shell commands. Run repository matching, worktree creation, state capture, and clean deletion. Remove only the exact temporary directory after the smoke check.
 
