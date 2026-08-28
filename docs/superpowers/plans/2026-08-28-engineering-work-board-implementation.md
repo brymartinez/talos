@@ -370,35 +370,35 @@ git commit -m "feat: add supervised coding agents"
 - Create: `src/worker/handlers/delete-worktree.ts`
 - Modify: `src/db/repositories.ts`
 
-- [ ] **Step 1: Add queue leasing and recovery**
+- [x] **Step 1: Add queue leasing and recovery**
 
 Lease pending jobs in creation order up to the configured concurrency. Renew active leases. On startup, mark expired leases and their active runs as interrupted.
 
-- [ ] **Step 2: Handle manual refresh jobs**
+- [x] **Step 2: Handle manual refresh jobs**
 
 Create a refresh run, execute the GitHub sync, record partial errors, and save the final result without blocking other read requests.
 
-- [ ] **Step 3: Handle Planning jobs**
+- [x] **Step 3: Handle Planning jobs**
 
 Resolve the workspace, start the selected work agent with read-only access, store normalized events, save the plan result, and keep the card in Planning. When the structured result contains questions or a blocker that needs user context, set the run to `needs_input` and store each question on the run.
 
-- [ ] **Step 4: Handle Building jobs**
+- [x] **Step 4: Handle Building jobs**
 
 Require a successful Planning session. Resume that exact provider session, allow worktree edits, save check results and PR text, then enforce the Git state policy. Save blocker questions and use `needs_input` when the agent cannot continue without user context.
 
-- [ ] **Step 5: Handle Review jobs**
+- [x] **Step 5: Handle Review jobs**
 
 Select the other provider, start a fresh read-only session, include prior outputs and the current diff, and save review findings without changing files. Save blocker questions and use `needs_input` when the review cannot finish without user context.
 
-- [ ] **Step 6: Handle Retry, Cancel, VS Code, and deletion**
+- [x] **Step 6: Handle Retry, Cancel, VS Code, and deletion**
 
 Retry creates a new run. For `needs_input`, reject Retry until the card notes have a modification time later than the blocked run and include the updated notes in the follow-up prompt. Resume only a valid unchanged work-agent session. Cancel signals the active process tree. Validate worktree paths before launching VS Code or deleting anything.
 
-- [ ] **Step 7: Add clean shutdown**
+- [x] **Step 7: Add clean shutdown**
 
 Stop leasing new work, cancel lease renewal, wait briefly for active database writes, and leave active agent runs marked interrupted when the process exits unexpectedly.
 
-- [ ] **Step 8: Run worker smoke checks with no pending jobs**
+- [x] **Step 8: Run worker smoke checks with no pending jobs**
 
 Start the worker against a temporary app-data directory. Confirm migration, startup recovery, idle polling, and signal shutdown in the terminal.
 

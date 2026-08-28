@@ -1,0 +1,86 @@
+import { getConfigResult } from "@/src/config/env";
+import { cancelAgentProcess } from "@/src/agents/process";
+import { closeDatabases, getDatabase } from "@/src/db/client";
+import { cardIdSchema } from "@/src/domain/types";
+import { handleDeleteWorktree } from "@/src/worker/handlers/delete-worktree";
+import { handleOpenVsCode } from "@/src/worker/handlers/open-vscode";
+import { handleRunStage } from "@/src/worker/handlers/run-stage";
+import { handleSyncGitHub } from "@/src/worker/handlers/sync-github";
+import { cancellationRequested, finishJob, leaseNextJob, recoverExpiredJobs, renewLease, type LeasedJob } from "@/src/worker/queue";
+
+const configuration = getConfigResult();
+if (!configuration.ok) {
+  console.error("Worker configuration error:", configuration.errors);
+  process.exit(1);
+}
+const config = configuration.config;
+const database = getDatabase(config);
+const workerId = crypto.randomUUID();
+let stopping = false;
+const activeRunIds = new Set<string>();
+recoverExpiredJobs(database);
+
+async function handle(job: LeasedJob): Promise<void> {
+  if (job.kind === "sync_github") return handleSyncGitHub(database, config);
+  if (!job.cardId) throw new Error(`${job.kind} requires a card`);
+  if (job.kind === "run_stage") {
+    if (!job.runId) throw new Error("run_stage requires a run");
+    return handleRunStage({ database, config, cardId: job.cardId, runId: job.runId, payload: job.payload });
+  }
+  const workspace = database.query<{ worktree_path: string }, [typeof job.cardId]>(
+    "SELECT worktree_path FROM workspaces WHERE card_id = ?",
+  ).get(job.cardId);
+  if (job.kind === "open_vscode") {
+    if (!workspace) throw new Error("Card has no workspace yet");
+    return handleOpenVsCode(config, workspace.worktree_path);
+  }
+  const force = Boolean((job.payload as { force?: unknown }).force);
+  return handleDeleteWorktree(database, cardIdSchema.parse(job.cardId), force);
+}
+
+const stop = (): void => {
+  stopping = true;
+  for (const runId of activeRunIds) void cancelAgentProcess(runId);
+};
+process.once("SIGINT", stop);
+process.once("SIGTERM", stop);
+console.log(`Engineering Work Board worker ${workerId} ready`);
+
+while (!stopping) {
+  const jobs: LeasedJob[] = [];
+  while (jobs.length < config.agentConcurrency) {
+    const job = leaseNextJob(database, workerId);
+    if (!job) break;
+    jobs.push(job);
+  }
+  if (jobs.length === 0) {
+    await Bun.sleep(500);
+    continue;
+  }
+  await Promise.all(jobs.map(async (job) => {
+    if (job.runId) activeRunIds.add(job.runId);
+    const renewal = setInterval(() => {
+      renewLease(database, job.id, workerId);
+      if (job.runId && cancellationRequested(database, job.id)) void cancelAgentProcess(job.runId);
+    }, 1_000);
+    try {
+      await handle(job);
+      finishJob(database, job.id);
+    } catch (error) {
+      console.error(`Job ${job.id} failed`, error);
+      if (job.runId) {
+        const timestamp = new Date().toISOString();
+        database.query<unknown, [string, string, string, string]>(
+          `UPDATE agent_runs SET status = 'failed', error_message = ?, finished_at = ?, updated_at = ?
+           WHERE id = ? AND status IN ('queued', 'running')`,
+        ).run(error instanceof Error ? error.message : String(error), timestamp, timestamp, job.runId);
+      }
+      finishJob(database, job.id, error);
+    } finally {
+      clearInterval(renewal);
+      if (job.runId) activeRunIds.delete(job.runId);
+    }
+  }));
+}
+closeDatabases();
+console.log("Engineering Work Board worker stopped");
