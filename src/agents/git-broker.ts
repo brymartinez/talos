@@ -31,6 +31,14 @@ const blockedArguments = new Set([
   "--no-index",
   "--contents",
 ]);
+const blockedArgumentPrefixes = [
+  "--contents=",
+  "--ext-diff=",
+  "--filters=",
+  "--open-files-in-pager=",
+  "--output=",
+  "--textconv=",
+];
 
 function validateArguments(args: readonly string[]): string | null {
   if (args.length === 0 || !allowedCommands.has(args[0] ?? "")) {
@@ -39,7 +47,9 @@ function validateArguments(args: readonly string[]): string | null {
   if (args.length > 128 || args.some((argument) => argument.length > 4_096)) {
     return "Git request is too large";
   }
-  if (args.some((argument) => blockedArguments.has(argument) || argument.startsWith("--output="))) {
+  if (args.some((argument) => (
+    blockedArguments.has(argument) || blockedArgumentPrefixes.some((prefix) => argument.startsWith(prefix))
+  ))) {
     return "Engineering Work Board blocked an unsafe Git option";
   }
   return null;
