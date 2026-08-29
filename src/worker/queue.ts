@@ -69,12 +69,13 @@ export function cancellationRequested(database: Database, jobId: JobId): boolean
 export function finishJob(database: Database, jobId: JobId, error?: unknown): void {
   const message = error instanceof Error ? error.message : error ? String(error) : null;
   database.query<unknown, ["completed" | "failed", string | null, string, JobId]>(
-    "UPDATE queue_jobs SET state = ?, error_message = ?, lease_expires_at = NULL, updated_at = ? WHERE id = ?",
+    "UPDATE queue_jobs SET state = ?, error_message = ?, lease_expires_at = NULL, updated_at = ? WHERE id = ? AND state = 'leased'",
   ).run(message ? "failed" : "completed", message, new Date().toISOString(), jobId);
 }
 
 export function finishCancelledJob(database: Database, jobId: JobId): void {
   database.query<unknown, [string, JobId]>(
-    `UPDATE queue_jobs SET state = 'cancelled', lease_expires_at = NULL, updated_at = ? WHERE id = ?`,
+    `UPDATE queue_jobs SET state = 'cancelled', lease_expires_at = NULL, updated_at = ?
+     WHERE id = ? AND state IN ('pending', 'leased')`,
   ).run(new Date().toISOString(), jobId);
 }

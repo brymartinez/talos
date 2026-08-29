@@ -103,9 +103,11 @@ export async function handleRunStage(input: Readonly<{
       "INSERT INTO agent_sessions (id, card_id, provider, purpose, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
     ).run(sessionId, cardId, provider, stage === "review" ? "review" : "work", timestamp, timestamp);
   }
-  input.database.query<unknown, [string, AgentProvider, string, string, typeof runId]>(
-    "UPDATE agent_runs SET session_id = ?, provider = ?, status = 'running', started_at = ?, updated_at = ? WHERE id = ?",
+  const started = input.database.query<unknown, [string, AgentProvider, string, string, typeof runId]>(
+    `UPDATE agent_runs SET session_id = ?, provider = ?, status = 'running', started_at = ?, updated_at = ?
+     WHERE id = ? AND status = 'queued'`,
   ).run(sessionId, provider, timestamp, timestamp, runId);
+  if (started.changes !== 1) throw new Error("Run is no longer queued");
   const prompt = stagePrompt({
     stage,
     title: context.title,
@@ -146,7 +148,7 @@ export async function handleRunStage(input: Readonly<{
       [string, string | null, string | null, string, string, string, string | null, string, typeof runId]
     >(
       `UPDATE agent_runs SET status = ?, summary = ?, result_json = ?, questions_json = ?,
-       log_path = ?, finished_at = ?, error_message = ?, updated_at = ? WHERE id = ?`,
+       log_path = ?, finished_at = ?, error_message = ?, updated_at = ? WHERE id = ? AND status = 'running'`,
     ).run(
       status,
       result?.summary ?? null,

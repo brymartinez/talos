@@ -4,17 +4,36 @@ import { dirname } from "node:path";
 import { createInterface } from "node:readline";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 
+import { startGitBroker } from "@/src/agents/git-broker";
 import type { AgentEvent } from "@/src/agents/types";
 
 const activeProcesses = new Map<string, ChildProcessWithoutNullStreams>();
+const activeCancellations = new Map<string, Promise<void>>();
 
-function terminateProcessTree(child: ChildProcessWithoutNullStreams): void {
+function terminateProcessTree(child: ChildProcessWithoutNullStreams, signal: NodeJS.Signals): void {
   if (!child.pid) return;
   try {
-    process.kill(-child.pid, "SIGTERM");
+    process.kill(-child.pid, signal);
   } catch {
-    child.kill("SIGTERM");
+    child.kill(signal);
   }
+}
+
+async function waitForExit(child: ChildProcessWithoutNullStreams, timeoutMs: number): Promise<boolean> {
+  if (child.exitCode !== null || child.signalCode !== null) return true;
+  return new Promise<boolean>((resolvePromise) => {
+    const timer = setTimeout(() => {
+      child.off("exit", onExit);
+      resolvePromise(false);
+    }, timeoutMs);
+    const onExit = (): void => {
+      clearTimeout(timer);
+      child.off("exit", onExit);
+      resolvePromise(true);
+    };
+    child.once("exit", onExit);
+    if (child.exitCode !== null || child.signalCode !== null) onExit();
+  });
 }
 
 export async function* streamAgentProcess(input: Readonly<{
@@ -34,9 +53,15 @@ export async function* streamAgentProcess(input: Readonly<{
     log.once("error", reject);
   });
 
+  const gitBroker = await startGitBroker({ cwd: input.cwd });
+
   const child = spawn(input.command, [...input.args], {
     cwd: input.cwd,
-    env: input.environment,
+    env: {
+      ...input.environment,
+      ENG_WORK_BOARD_GIT_BROKER_URL: gitBroker.endpoint,
+      ENG_WORK_BOARD_GIT_BROKER_TOKEN: gitBroker.token,
+    },
     detached: true,
     stdio: "pipe",
   });
@@ -88,7 +113,7 @@ export async function* streamAgentProcess(input: Readonly<{
       }
     } catch (error) {
       failure.value = error instanceof Error ? error : new Error("Agent output failed");
-      terminateProcessTree(child);
+      terminateProcessTree(child, "SIGTERM");
     } finally {
       openReaders -= 1;
       notify();
@@ -96,7 +121,7 @@ export async function* streamAgentProcess(input: Readonly<{
   };
   log.on("error", (error) => {
     failure.value = error;
-    terminateProcessTree(child);
+    terminateProcessTree(child, "SIGTERM");
     notify();
   });
   void read(child.stdout, "stdout");
@@ -126,16 +151,27 @@ export async function* streamAgentProcess(input: Readonly<{
     yield { kind: "completed", exitCode: failure.value ? 1 : processExit ?? 1 };
   } finally {
     activeProcesses.delete(input.runId);
+    await gitBroker.close();
     await new Promise<void>((resolvePromise) => log.end(resolvePromise));
   }
 }
 
 export async function cancelAgentProcess(runId: string): Promise<void> {
+  const activeCancellation = activeCancellations.get(runId);
+  if (activeCancellation) return activeCancellation;
   const child = activeProcesses.get(runId);
   if (!child?.pid) return;
+  const cancellation = (async () => {
+    terminateProcessTree(child, "SIGTERM");
+    if (!(await waitForExit(child, 2_000))) {
+      terminateProcessTree(child, "SIGKILL");
+      await waitForExit(child, 2_000);
+    }
+  })();
+  activeCancellations.set(runId, cancellation);
   try {
-    terminateProcessTree(child);
+    await cancellation;
   } finally {
-    activeProcesses.delete(runId);
+    if (activeCancellations.get(runId) === cancellation) activeCancellations.delete(runId);
   }
 }

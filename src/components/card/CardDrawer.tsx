@@ -43,6 +43,7 @@ export function CardDrawer({ card, onClose, onChanged }: Readonly<{ card: WorkCa
           {latest.summary ? <p>{latest.summary}</p> : null}
           {latest.errorMessage ? <p className="action-error">{latest.errorMessage}</p> : null}
           {latest.questions.length ? <div className="run-section"><h4>Questions</h4><ul>{latest.questions.map((question) => <li key={question}>{question}</li>)}</ul></div> : null}
+          {result?.blockers.length ? <div className="run-section"><h4>Blockers</h4><ul>{result.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul></div> : null}
           {result?.plan.length ? <div className="run-section"><h4>Plan</h4><ul>{result.plan.map((item) => <li key={`${item.file}-${item.change}`}><code>{item.file}</code> {item.change}</li>)}</ul></div> : null}
           {result?.changedFiles.length ? <div className="run-section"><h4>Changed files</h4><ul>{result.changedFiles.map((file) => <li key={file}><code>{file}</code></li>)}</ul></div> : null}
           {result?.checks.length ? <div className="run-section"><h4>Checks</h4><ul>{result.checks.map((check) => <li key={`${check.command}-${check.result}`}><code>{check.command}</code> {check.result}</li>)}</ul></div> : null}

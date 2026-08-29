@@ -30,7 +30,7 @@ export class CodexRunner implements AgentRunner {
   resume(input: ResumeRunInput): AsyncIterable<AgentEvent> { return this.#run(input, input.sessionId); }
   cancel(runId: string): Promise<void> { return cancelAgentProcess(runId); }
   async *#run(input: StartRunInput, sessionId?: string): AsyncIterable<AgentEvent> {
-    const policy = await prepareAgentPolicy(input);
+    const policy = await prepareAgentPolicy({ ...input, provider: this.provider });
     const command = Bun.which("codex");
     if (!command) throw new Error("Codex CLI is not installed");
     const providerArgs = sessionId

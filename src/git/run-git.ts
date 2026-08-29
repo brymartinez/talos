@@ -10,6 +10,7 @@ export async function runGit(input: Readonly<{
   signal?: AbortSignal;
   allowFailure?: boolean;
   preserveWhitespace?: boolean;
+  environment?: NodeJS.ProcessEnv;
 }>): Promise<GitResult> {
   const gitExecutable = Bun.which("git");
   if (!gitExecutable) {
@@ -20,6 +21,7 @@ export async function runGit(input: Readonly<{
     stdout: "pipe",
     stderr: "pipe",
     signal: input.signal,
+    env: input.environment,
   });
   const [stdout, stderr, exitCode] = await Promise.all([
     new Response(process.stdout).text(),

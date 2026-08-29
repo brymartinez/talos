@@ -18,6 +18,7 @@ const database = getBunDatabase(config);
 const workerId = crypto.randomUUID();
 let stopping = false;
 const activeRunIds = new Set<string>();
+const activeJobs = new Map<string, LeasedJob>();
 recoverExpiredJobs(database);
 let lastRecoveryAt = Date.now();
 
@@ -48,7 +49,23 @@ async function handle(job: LeasedJob): Promise<void> {
 }
 
 const stop = (): void => {
+  if (stopping) return;
   stopping = true;
+  const timestamp = new Date().toISOString();
+  database.transaction(() => {
+    for (const job of activeJobs.values()) {
+      database.query<unknown, [string, string]>(
+        `UPDATE queue_jobs SET state = 'interrupted', lease_expires_at = NULL, updated_at = ?
+         WHERE id = ? AND state = 'leased'`,
+      ).run(timestamp, job.id);
+      if (job.runId) {
+        database.query<unknown, [string, string, string]>(
+          `UPDATE agent_runs SET status = 'interrupted', finished_at = ?, updated_at = ?
+           WHERE id = ? AND status IN ('queued', 'running')`,
+        ).run(timestamp, timestamp, job.runId);
+      }
+    }
+  })();
   for (const runId of activeRunIds) void cancelAgentProcess(runId);
 };
 process.once("SIGINT", stop);
@@ -71,6 +88,7 @@ while (!stopping) {
     continue;
   }
   await Promise.all(jobs.map(async (job) => {
+    activeJobs.set(job.id, job);
     if (job.runId) activeRunIds.add(job.runId);
     const renewal = setInterval(() => {
       renewLease(database, job.id, workerId);
@@ -85,7 +103,7 @@ while (!stopping) {
         finishJob(database, job.id);
       }
     } catch (error) {
-      console.error(`Job ${job.id} failed`, error);
+      if (!stopping) console.error(`Job ${job.id} failed`, error);
       const cancelled = cancellationRequested(database, job.id);
       if (job.runId) {
         if (cancelled) {
@@ -102,6 +120,7 @@ while (!stopping) {
       else finishJob(database, job.id, error);
     } finally {
       clearInterval(renewal);
+      activeJobs.delete(job.id);
       if (job.runId) activeRunIds.delete(job.runId);
     }
   }));

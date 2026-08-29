@@ -1,8 +1,9 @@
-import { chmod, mkdir, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, realpath, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
 import { homedir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, join, resolve } from "node:path";
 
-import type { Stage } from "@/src/domain/types";
+import type { AgentProvider, Stage } from "@/src/domain/types";
 import { runGit } from "@/src/git/run-git";
 import { changedOutsideWorktree, type GitState } from "@/src/git/state";
 
@@ -15,73 +16,117 @@ function quoteSandboxPath(path: string): string {
   return path.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
 }
 
+async function executablePaths(name: string): Promise<readonly string[]> {
+  const paths = new Set<string>();
+  for (const directory of (process.env.PATH ?? "").split(delimiter)) {
+    if (!directory) continue;
+    const candidate = join(directory, name);
+    try {
+      await access(candidate, constants.X_OK);
+      paths.add(candidate);
+      paths.add(await realpath(candidate));
+    } catch {
+      // This PATH entry does not contain the executable.
+    }
+  }
+  return [...paths];
+}
+
+function denyExecutable(path: string): string {
+  const quoted = quoteSandboxPath(path);
+  return `(deny process-exec (literal "${quoted}"))\n(deny file-read* (literal "${quoted}"))`;
+}
+
 export async function prepareAgentPolicy(input: Readonly<{
   guardDirectory: string;
   stage: Exclude<Stage, "backlog" | "done">;
   cwd: string;
   runId: string;
+  provider: AgentProvider;
 }>): Promise<Readonly<{
   environment: NodeJS.ProcessEnv;
   sandbox: "read-only" | "workspace-write";
   sandboxExecutable: string;
   sandboxProfile: string;
 }>> {
-  const emptyGitHubConfig = join(input.guardDirectory, "empty-gh");
+  const runDirectory = join(input.guardDirectory, "runs", input.runId);
+  const binDirectory = join(runDirectory, "bin");
+  const emptyGitHubConfig = join(runDirectory, "empty-gh");
+  const temporaryDirectory = join(runDirectory, "tmp");
+  const cacheDirectory = join(runDirectory, "cache");
   await Promise.all([
-    mkdir(input.guardDirectory, { recursive: true }),
+    mkdir(binDirectory, { recursive: true }),
     mkdir(emptyGitHubConfig, { recursive: true }),
+    mkdir(temporaryDirectory, { recursive: true }),
+    mkdir(cacheDirectory, { recursive: true }),
   ]);
-  const realGit = Bun.which("git");
   const sandboxExecutable = Bun.which("sandbox-exec");
-  if (!realGit) throw new Error("git is not installed or is not available on PATH");
   if (!sandboxExecutable) throw new Error("sandbox-exec is required to enforce agent Git policy");
-  const gitPath = join(input.guardDirectory, "git");
-  const ghPath = join(input.guardDirectory, "gh");
+  const curlExecutable = Bun.which("curl");
+  if (!curlExecutable) throw new Error("curl is required to provide read-only Git inspection");
+  const gitPath = join(binDirectory, "git");
+  const ghPath = join(binDirectory, "gh");
   const gitWrapper = `#!/bin/sh
-args="$*"
-case "$args" in
-  *alias.*) echo "Engineering Work Board blocks Git aliases" >&2; exit 77 ;;
+response=$(mktemp "$TMPDIR/git-response.XXXXXX") || exit 1
+trap 'rm -f "$response"' EXIT
+printf '%s\n' "$@" | "${curlExecutable}" --fail-with-body --silent --show-error \
+  --header "Authorization: Bearer $ENG_WORK_BOARD_GIT_BROKER_TOKEN" \
+  --data-binary @- "$ENG_WORK_BOARD_GIT_BROKER_URL" > "$response" || exit 1
+status=$(sed -n '1p' "$response")
+sed -n '2,$p' "$response"
+case "$status" in
+  ''|*[!0-9]*) exit 1 ;;
+  *) exit "$status" ;;
 esac
-find_command() {
-  while [ "$#" -gt 0 ]; do
-    case "$1" in
-      -C|-c|--git-dir|--work-tree|--namespace|--super-prefix) shift 2 ;;
-      --*|-*) shift ;;
-      *) echo "$1"; return ;;
-    esac
-  done
-}
-command=$(find_command "$@")
-case "$command" in
-  commit|push|tag|reset|clean) echo "Engineering Work Board blocked git $command" >&2; exit 77 ;;
-esac
-exec "${realGit}" "$@"
 `;
   await Promise.all([writeFile(gitPath, gitWrapper), writeFile(ghPath, ghWrapper)]);
   await Promise.all([chmod(gitPath, 0o700), chmod(ghPath, 0o700)]);
   const commonDirectory = (
     await runGit({ args: ["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd: input.cwd })
   ).stdout;
-  const readOnlyRule = input.stage === "building"
-    ? ""
-    : `(deny file-write* (subpath "${quoteSandboxPath(input.cwd)}"))`;
-  const sandboxProfile = join(input.guardDirectory, `${input.runId}.sb`);
+  const gitExecPath = (await runGit({ args: ["--exec-path"] })).stdout;
+  const credentialHelpers = [
+    "git-credential-cache",
+    "git-credential-cache--daemon",
+    "git-credential-osxkeychain",
+    "git-credential-store",
+  ].map((name) => join(gitExecPath, name));
+  const xcodeGit = resolve(gitExecPath, "../../bin/git");
+  const blockedExecutables = new Set([
+    ...(await executablePaths("git")),
+    ...(await executablePaths("gh")),
+    xcodeGit,
+    ...credentialHelpers,
+    "/usr/bin/security",
+    "/usr/bin/ssh",
+    "/usr/bin/xcrun",
+  ]);
+  const providerWriteRules = input.provider === "codex"
+    ? `(allow file-write* (subpath "${quoteSandboxPath(join(homedir(), ".codex"))}"))`
+    : `(allow file-write* (subpath "${quoteSandboxPath(join(homedir(), ".claude"))}"))
+(allow file-write* (literal "${quoteSandboxPath(join(homedir(), ".claude.json"))}"))`;
+  const worktreeWriteRule = input.stage === "building"
+    ? `(allow file-write* (subpath "${quoteSandboxPath(input.cwd)}"))`
+    : "";
+  const sandboxProfile = join(runDirectory, "agent.sb");
   await writeFile(
     sandboxProfile,
     `(version 1)
 (allow default)
+(deny file-write*)
+(allow file-write* (subpath "${quoteSandboxPath(runDirectory)}"))
+${providerWriteRules}
+${worktreeWriteRule}
 (deny file-write* (subpath "${quoteSandboxPath(commonDirectory)}"))
 (deny file-write* (literal "${quoteSandboxPath(join(input.cwd, ".git"))}"))
 (deny file-read* (subpath "${quoteSandboxPath(join(homedir(), ".ssh"))}"))
 (deny file-read* (subpath "${quoteSandboxPath(join(homedir(), ".config", "gh"))}"))
-(deny process-exec (literal "/usr/bin/security"))
-(deny process-exec (literal "/usr/bin/ssh"))
-${readOnlyRule}
+${[...blockedExecutables].map(denyExecutable).join("\n")}
 `,
   );
   const environment = { ...process.env };
   for (const key of Object.keys(environment)) {
-    if (/^(GITHUB_|GH_|GIT_ASKPASS|SSH_ASKPASS|GIT_TERMINAL_PROMPT)/.test(key)) {
+    if (/^(GITHUB_|GH_|GIT_|SSH_|ENG_WORK_BOARD_)/.test(key)) {
       delete environment[key];
     }
   }
@@ -91,7 +136,13 @@ ${readOnlyRule}
   environment.GIT_OPTIONAL_LOCKS = "0";
   environment.GIT_SSH_COMMAND = "/usr/bin/false";
   environment.GIT_TERMINAL_PROMPT = "0";
-  environment.PATH = `${input.guardDirectory}${delimiter}${environment.PATH ?? ""}`;
+  environment.TMPDIR = temporaryDirectory;
+  environment.XDG_CACHE_HOME = cacheDirectory;
+  environment.BUN_INSTALL_CACHE_DIR = join(cacheDirectory, "bun");
+  environment.COREPACK_HOME = join(cacheDirectory, "corepack");
+  environment.YARN_CACHE_FOLDER = join(cacheDirectory, "yarn");
+  environment.npm_config_cache = join(cacheDirectory, "npm");
+  environment.PATH = `${binDirectory}${delimiter}${environment.PATH ?? ""}`;
   return {
     environment,
     sandbox: input.stage === "building" ? "workspace-write" : "read-only",
