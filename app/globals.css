@@ -487,6 +487,18 @@ textarea:focus-visible {
   margin: 0;
 }
 
+.run-section {
+  margin-top: 18px;
+}
+
+.run-section ul {
+  padding-left: 20px;
+}
+
+.run-section li + li {
+  margin-top: 8px;
+}
+
 .run-panel pre {
   max-height: 280px;
   overflow: auto;
@@ -496,6 +508,28 @@ textarea:focus-visible {
   color: var(--green);
   font-size: 0.73rem;
   white-space: pre-wrap;
+}
+
+.run-history {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.run-history li {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.run-history p {
+  margin-bottom: 6px;
+}
+
+.run-history small {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--muted);
 }
 
 .drawer-actions {

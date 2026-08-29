@@ -1,7 +1,9 @@
+import type { AgentResult } from "@/src/agents/types";
+
 export type Stage = "backlog" | "planning" | "building" | "review" | "done";
 export type Run = Readonly<{
   id: string; stage: Stage; provider: "codex" | "claude"; status: string;
-  summary: string | null; result: Record<string, unknown> | null; questions: readonly string[];
+  summary: string | null; result: AgentResult | null; questions: readonly string[];
   errorMessage: string | null; logUrl: string | null; createdAt: string; finishedAt: string | null;
 }>;
 export type WorkCardData = Readonly<{

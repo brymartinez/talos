@@ -1,5 +1,6 @@
 import type { Database } from "@/src/db/sqlite";
 
+import { agentResultSchema } from "@/src/agents/types";
 import type { AppConfig } from "@/src/config/env";
 import { matchReasonSchema, runStateSchema, stageSchema } from "@/src/domain/types";
 
@@ -49,7 +50,7 @@ export function boardSnapshot(database: Database, config: AppConfig): unknown {
     list.push({
       id: run.id, stage: stageSchema.parse(run.stage), provider: run.provider,
       status: runStateSchema.parse(run.status), summary: run.summary,
-      result: run.result_json ? JSON.parse(run.result_json) : null,
+      result: run.result_json ? agentResultSchema.parse(JSON.parse(run.result_json)) : null,
       questions: JSON.parse(run.questions_json ?? "[]"), errorMessage: run.error_message,
       logUrl: run.log_path ? `/api/runs/${run.id}/log` : null,
       createdAt: run.created_at, finishedAt: run.finished_at,
