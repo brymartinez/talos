@@ -56,11 +56,29 @@ export async function* streamAgentProcess(input: Readonly<{
     queue.push(event);
     notify();
   };
+  const waitForLogDrain = async (): Promise<void> => {
+    await new Promise<void>((resolvePromise, reject) => {
+      const cleanup = (): void => {
+        log.off("drain", onDrain);
+        log.off("error", onError);
+      };
+      const onDrain = (): void => {
+        cleanup();
+        resolvePromise();
+      };
+      const onError = (error: Error): void => {
+        cleanup();
+        reject(error);
+      };
+      log.once("drain", onDrain);
+      log.once("error", onError);
+    });
+  };
   const read = async (stream: NodeJS.ReadableStream, source: "stdout" | "stderr"): Promise<void> => {
     try {
       for await (const line of createInterface({ input: stream })) {
         if (!log.write(`[${source}] ${line}\n`)) {
-          await new Promise<void>((resolvePromise) => log.once("drain", resolvePromise));
+          await waitForLogDrain();
         }
         if (source === "stderr") {
           push({ kind: "progress", message: line });
@@ -105,7 +123,7 @@ export async function* streamAgentProcess(input: Readonly<{
       });
     }
     if (failure.value) yield { kind: "error", message: failure.value.message };
-    yield { kind: "completed", exitCode: processExit ?? 1 };
+    yield { kind: "completed", exitCode: failure.value ? 1 : processExit ?? 1 };
   } finally {
     activeProcesses.delete(input.runId);
     await new Promise<void>((resolvePromise) => log.end(resolvePromise));

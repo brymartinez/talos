@@ -6,7 +6,7 @@ import { handleDeleteWorktree } from "@/src/worker/handlers/delete-worktree";
 import { handleOpenVsCode } from "@/src/worker/handlers/open-vscode";
 import { handleRunStage } from "@/src/worker/handlers/run-stage";
 import { handleSyncGitHub } from "@/src/worker/handlers/sync-github";
-import { cancellationRequested, finishJob, leaseNextJob, recoverExpiredJobs, renewLease, type LeasedJob } from "@/src/worker/queue";
+import { cancellationRequested, finishCancelledJob, finishJob, leaseNextJob, recoverExpiredJobs, renewLease, type LeasedJob } from "@/src/worker/queue";
 
 const configuration = getConfigResult();
 if (!configuration.ok) {
@@ -19,6 +19,15 @@ const workerId = crypto.randomUUID();
 let stopping = false;
 const activeRunIds = new Set<string>();
 recoverExpiredJobs(database);
+let lastRecoveryAt = Date.now();
+
+function finishRunAsCancelled(runId: string): void {
+  const timestamp = new Date().toISOString();
+  database.query<unknown, [string, string, string]>(
+    `UPDATE agent_runs SET status = 'cancelled', error_message = NULL, finished_at = ?, updated_at = ?
+     WHERE id = ? AND status IN ('queued', 'running', 'succeeded', 'failed', 'needs_input')`,
+  ).run(timestamp, timestamp, runId);
+}
 
 async function handle(job: LeasedJob): Promise<void> {
   if (job.kind === "sync_github") return handleSyncGitHub(database, config);
@@ -35,7 +44,7 @@ async function handle(job: LeasedJob): Promise<void> {
     return handleOpenVsCode(config, workspace.worktree_path);
   }
   const force = Boolean((job.payload as { force?: unknown }).force);
-  return handleDeleteWorktree(database, cardIdSchema.parse(job.cardId), force);
+  return handleDeleteWorktree(database, config, cardIdSchema.parse(job.cardId), force);
 }
 
 const stop = (): void => {
@@ -47,6 +56,10 @@ process.once("SIGTERM", stop);
 console.log(`Engineering Work Board worker ${workerId} ready`);
 
 while (!stopping) {
+  if (Date.now() - lastRecoveryAt >= 5_000) {
+    recoverExpiredJobs(database);
+    lastRecoveryAt = Date.now();
+  }
   const jobs: LeasedJob[] = [];
   while (jobs.length < config.agentConcurrency) {
     const job = leaseNextJob(database, workerId);
@@ -65,17 +78,28 @@ while (!stopping) {
     }, 1_000);
     try {
       await handle(job);
-      finishJob(database, job.id);
+      if (cancellationRequested(database, job.id)) {
+        if (job.runId) finishRunAsCancelled(job.runId);
+        finishCancelledJob(database, job.id);
+      } else {
+        finishJob(database, job.id);
+      }
     } catch (error) {
       console.error(`Job ${job.id} failed`, error);
+      const cancelled = cancellationRequested(database, job.id);
       if (job.runId) {
-        const timestamp = new Date().toISOString();
-        database.query<unknown, [string, string, string, string]>(
-          `UPDATE agent_runs SET status = 'failed', error_message = ?, finished_at = ?, updated_at = ?
-           WHERE id = ? AND status IN ('queued', 'running')`,
-        ).run(error instanceof Error ? error.message : String(error), timestamp, timestamp, job.runId);
+        if (cancelled) {
+          finishRunAsCancelled(job.runId);
+        } else {
+          const timestamp = new Date().toISOString();
+          database.query<unknown, [string, string, string, string]>(
+            `UPDATE agent_runs SET status = 'failed', error_message = ?, finished_at = ?, updated_at = ?
+             WHERE id = ? AND status IN ('queued', 'running', 'failed')`,
+          ).run(error instanceof Error ? error.message : String(error), timestamp, timestamp, job.runId);
+        }
       }
-      finishJob(database, job.id, error);
+      if (cancelled) finishCancelledJob(database, job.id);
+      else finishJob(database, job.id, error);
     } finally {
       clearInterval(renewal);
       if (job.runId) activeRunIds.delete(job.runId);

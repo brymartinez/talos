@@ -130,6 +130,7 @@ async function searchIssues(client: GitHubClient, query: string): Promise<readon
 async function readRepositories(
   client: GitHubClient,
   config: AppConfig,
+  onError: (error: Readonly<{ scope: string; code: string; message: string }>) => void,
 ): Promise<readonly RepositoryResponse[]> {
   const organizationRepositories = await client.restPages({
     path: `/orgs/${encodeURIComponent(config.githubOrganization)}/repos?type=all`,
@@ -143,13 +144,17 @@ async function readRepositories(
   );
   for (const repositoryName of config.extraRepositories) {
     if (!byName.has(repositoryName)) {
-      const repository = await client.rest({
-        path: `/repos/${repositoryName}`,
-        schema: repositorySchema,
-        scope: `repository:${repositoryName}`,
-      });
-      if (!repository.archived) {
-        byName.set(repository.full_name.toLowerCase(), repository);
+      try {
+        const repository = await client.rest({
+          path: `/repos/${repositoryName}`,
+          schema: repositorySchema,
+          scope: `repository:${repositoryName}`,
+        });
+        if (!repository.archived) {
+          byName.set(repository.full_name.toLowerCase(), repository);
+        }
+      } catch (error) {
+        onError(refreshError(error, `repository:${repositoryName}`));
       }
     }
   }
@@ -182,9 +187,16 @@ export async function syncGitHub(input: Readonly<{
 
   try {
     const user = await client.rest({ path: "/user", schema: userSchema, scope: "authenticated-user" });
-    const repositories = await readRepositories(client, input.config);
+    const repositories = await readRepositories(client, input.config, (error) => errors.push(error));
     const allowedNames = new Set(repositories.map((repository) => repository.full_name.toLowerCase()));
-    const teams = await readTeams(client, input.config);
+    const failedReasons = new Set<MatchReason>();
+    let teams: readonly string[] = [];
+    try {
+      teams = await readTeams(client, input.config);
+    } catch (error) {
+      errors.push(refreshError(error, "teams"));
+      failedReasons.add("team_review_requested");
+    }
     const queries = buildSourceQueries({
       username: user.login,
       organization: input.config.githubOrganization,
@@ -211,6 +223,7 @@ export async function syncGitHub(input: Readonly<{
         }
       } catch (error) {
         errors.push(refreshError(error, sourceQuery.scope));
+        failedReasons.add(sourceQuery.reason);
       }
     }
 
@@ -303,6 +316,7 @@ export async function syncGitHub(input: Readonly<{
       trackedMissing: trackedOpen,
       workAgent: input.config.workAgent,
       allowStaleReconciliation: errors.length === 0,
+      preserveMatchReasons: [...failedReasons],
     });
     for (const error of errors) {
       recordRefreshError(input.database, refreshId, error);

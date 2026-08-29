@@ -1,11 +1,11 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, stat } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
 import type { Database } from "@/src/db/sqlite";
 
 import type { AppConfig } from "@/src/config/env";
 import type { CardId } from "@/src/domain/types";
-import { findLocalRepository } from "@/src/git/repository-locator";
+import { findLocalRepository, normalizeGitHubRemote } from "@/src/git/repository-locator";
 import { runGit } from "@/src/git/run-git";
 import { captureGitState, type GitState } from "@/src/git/state";
 
@@ -64,12 +64,24 @@ function reviewOnly(source: WorkspaceSource): boolean {
 export async function resolveRepository(source: WorkspaceSource, config: AppConfig): Promise<string> {
   return serialized(source.repositoryName, async () => {
     if (source.localClonePath) {
-      const check = await runGit({
+      const topLevel = await runGit({
         args: ["rev-parse", "--show-toplevel"],
         cwd: source.localClonePath,
         allowFailure: true,
       });
-      if (check.exitCode === 0) return source.localClonePath;
+      if (topLevel.exitCode === 0) {
+        const remote = await runGit({
+          args: ["remote", "get-url", "origin"],
+          cwd: topLevel.stdout,
+          allowFailure: true,
+        });
+        if (
+          remote.exitCode === 0 &&
+          normalizeGitHubRemote(remote.stdout) === source.repositoryName.toLowerCase()
+        ) {
+          return topLevel.stdout;
+        }
+      }
     }
     const local = await findLocalRepository({ roots: config.repositoryRoots, fullName: source.repositoryName });
     if (local) return local;
@@ -88,6 +100,30 @@ export async function createCardWorkspace(
   const worktreePath = join(config.paths.worktreesDirectory, source.cardId);
   await mkdir(config.paths.worktreesDirectory, { recursive: true });
   return serialized(source.repositoryName, async () => {
+    let worktreeExists = false;
+    try {
+      worktreeExists = (await stat(worktreePath)).isDirectory();
+    } catch {
+      worktreeExists = false;
+    }
+    if (worktreeExists) {
+      const registered = await runGit({ args: ["worktree", "list", "--porcelain"], cwd: repositoryPath });
+      if (!registered.stdout.split("\n").includes(`worktree ${worktreePath}`)) {
+        throw new Error("The card worktree path exists but is not registered with this repository");
+      }
+      const [head, branch] = await Promise.all([
+        runGit({ args: ["rev-parse", "HEAD"], cwd: worktreePath }),
+        runGit({ args: ["symbolic-ref", "--short", "HEAD"], cwd: worktreePath, allowFailure: true }),
+      ]);
+      return {
+        repositoryPath,
+        worktreePath,
+        branchName: branch.exitCode === 0 ? branch.stdout : null,
+        checkoutMode: branch.exitCode === 0 ? "branch" : "detached",
+        baseCommit: head.stdout,
+        beforeState: await captureGitState(worktreePath),
+      };
+    }
     await runGit({ args: ["fetch", "--prune", "origin"], cwd: repositoryPath });
     const detached = reviewOnly(source);
     let target = `origin/${source.defaultBranch}`;

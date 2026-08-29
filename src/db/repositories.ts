@@ -306,6 +306,7 @@ type ReconcileInput = Readonly<{
   trackedMissing: readonly TrackedOpenSource[];
   workAgent: AgentProvider;
   allowStaleReconciliation: boolean;
+  preserveMatchReasons: readonly MatchReason[];
 }>;
 
 export function reconcileSourceItems(database: Database, input: ReconcileInput): void {
@@ -427,11 +428,18 @@ export function reconcileSourceItems(database: Database, input: ReconcileInput):
           timestamp,
           timestamp,
         );
-      database.query<unknown, [string]>("DELETE FROM match_reasons WHERE source_item_id = ?").run(source.id);
+      if (input.preserveMatchReasons.length === 0) {
+        database.query<unknown, [string]>("DELETE FROM match_reasons WHERE source_item_id = ?").run(source.id);
+      } else {
+        const placeholders = input.preserveMatchReasons.map(() => "?").join(", ");
+        database.query<unknown, string[]>(
+          `DELETE FROM match_reasons WHERE source_item_id = ? AND reason NOT IN (${placeholders})`,
+        ).run(source.id, ...input.preserveMatchReasons);
+      }
       for (const reason of source.matchReasons) {
         database
           .query<unknown, [string, MatchReason]>(
-            "INSERT INTO match_reasons (source_item_id, reason) VALUES (?, ?)",
+            "INSERT INTO match_reasons (source_item_id, reason) VALUES (?, ?) ON CONFLICT DO NOTHING",
           )
           .run(source.id, reason);
       }

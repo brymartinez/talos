@@ -5,9 +5,9 @@ import { apiError, runtime } from "@/src/services/runtime";
 
 export const dynamic = "force-dynamic";
 
-export function GET(): NextResponse {
+export function GET(request: Request): NextResponse {
   try {
-    const { config, database } = runtime();
+    const { config, database } = runtime(request);
     return NextResponse.json(boardSnapshot(database, config));
   } catch (error) {
     return apiError(error);

@@ -1,17 +1,24 @@
 export {};
 
+import { getConfigResult } from "@/src/config/env";
+
 const children = [
   Bun.spawn(["bun", "run", "dev:web"], {
     stdin: "inherit",
     stdout: "inherit",
     stderr: "inherit",
   }),
-  Bun.spawn(["bun", "run", "worker"], {
+];
+
+if (getConfigResult().ok) {
+  children.push(Bun.spawn(["bun", "run", "worker"], {
     stdin: "inherit",
     stdout: "inherit",
     stderr: "inherit",
-  }),
-];
+  }));
+} else {
+  console.warn("Worker not started. Open the web app to see configuration errors.");
+}
 
 const stop = (signal: NodeJS.Signals): void => {
   for (const child of children) {

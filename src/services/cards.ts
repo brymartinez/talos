@@ -44,7 +44,15 @@ export function updateCard(database: Database, rawCardId: string, input: unknown
   const cardId = cardIdSchema.parse(rawCardId);
   const values = z.object({ notes: z.string().max(20_000).optional(), workAgent: agentProviderSchema.optional() }).parse(input);
   const card = loadCard(database, cardId);
-  if (values.workAgent && values.workAgent !== card.workAgent && card.stage !== "backlog") {
+  const planningCanRestart =
+    card.stage === "planning" &&
+    ["failed", "interrupted", "cancelled"].includes(card.activeRunState ?? "");
+  if (
+    values.workAgent &&
+    values.workAgent !== card.workAgent &&
+    card.stage !== "backlog" &&
+    !planningCanRestart
+  ) {
     throw new ServiceError("agent_locked", "The work agent can only change before Planning starts.", 409);
   }
   const timestamp = new Date().toISOString();
@@ -59,6 +67,13 @@ export function moveCard(database: Database, rawCardId: string, input: unknown):
   const card = loadCard(database, cardId);
   if (!canMoveCard(card, destination)) throw new ServiceError("invalid_move", "That stage move is not allowed.", 409);
   const forward = isForwardMove(card, destination);
+  if (forward && card.stage !== "backlog" && card.activeRunState !== "succeeded") {
+    throw new ServiceError(
+      "stage_not_ready",
+      "Finish the current stage successfully before moving this card forward.",
+      409,
+    );
+  }
   const runId = forward ? newRunId() : undefined;
   database.transaction(() => {
     if (runId) {
@@ -83,6 +98,9 @@ export function retryCard(database: Database, rawCardId: string): void {
   const cardId = cardIdSchema.parse(rawCardId);
   const card = loadCard(database, cardId);
   if (card.stage === "backlog" || card.stage === "done") throw new ServiceError("nothing_to_retry", "This card has no active stage to retry.", 409);
+  if (card.activeRunState === "queued" || card.activeRunState === "running") {
+    throw new ServiceError("run_active", "This card already has queued or running work.", 409);
+  }
   const prior = database.query<{ status: RunState; finished_at: string | null }, [CardId]>(
     "SELECT status, finished_at FROM agent_runs WHERE card_id = ? ORDER BY created_at DESC LIMIT 1",
   ).get(cardId);
@@ -120,5 +138,13 @@ export function cancelCard(database: Database, rawCardId: string): void {
 }
 
 export function queueCardAction(database: Database, rawCardId: string, kind: "open_vscode" | "delete_worktree", payload?: unknown): void {
-  insertQueueJob(database, { kind, cardId: cardIdSchema.parse(rawCardId), payload });
+  const cardId = cardIdSchema.parse(rawCardId);
+  const card = loadCard(database, cardId);
+  if (
+    kind === "delete_worktree" &&
+    (card.activeRunState === "queued" || card.activeRunState === "running")
+  ) {
+    throw new ServiceError("run_active", "Cancel the active run before deleting its worktree.", 409);
+  }
+  insertQueueJob(database, { kind, cardId, payload });
 }

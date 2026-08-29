@@ -32,8 +32,15 @@ export class ClaudeRunner implements AgentRunner {
     const command = Bun.which("claude");
     if (!command) throw new Error("Claude Code CLI is not installed");
     const permissionMode = input.stage === "building" ? "acceptEdits" : "plan";
-    const args = ["--print", "--output-format", "stream-json", "--verbose", "--permission-mode", permissionMode];
-    if (sessionId) args.push("--resume", sessionId);
-    yield* streamAgentProcess({ ...input, command, args, environment: policy.environment, parseLine: parseClaudeLine });
+    const providerArgs = ["--print", "--output-format", "stream-json", "--verbose", "--permission-mode", permissionMode];
+    if (sessionId) providerArgs.push("--resume", sessionId);
+    const args = ["-f", policy.sandboxProfile, command, ...providerArgs];
+    yield* streamAgentProcess({
+      ...input,
+      command: policy.sandboxExecutable,
+      args,
+      environment: policy.environment,
+      parseLine: parseClaudeLine,
+    });
   }
 }

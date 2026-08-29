@@ -84,7 +84,16 @@ export async function handleRunStage(input: Readonly<{
            AND agent_sessions.provider_session_id IS NOT NULL
          ORDER BY agent_runs.created_at DESC LIMIT 1`,
       ).get(cardId, provider)
-    : null;
+    : stage === "planning"
+      ? input.database.query<PriorSessionRow, [typeof cardId, AgentProvider, typeof runId]>(
+          `SELECT agent_sessions.id, agent_sessions.provider_session_id
+           FROM agent_runs JOIN agent_sessions ON agent_sessions.id = agent_runs.session_id
+           WHERE agent_runs.card_id = ? AND agent_runs.stage = 'planning'
+             AND agent_runs.status = 'needs_input' AND agent_sessions.provider = ?
+             AND agent_sessions.provider_session_id IS NOT NULL AND agent_runs.id <> ?
+           ORDER BY agent_runs.created_at DESC LIMIT 1`,
+        ).get(cardId, provider, runId)
+      : null;
   if (stage === "building" && !priorSession) {
     throw new Error("Building requires a successful Planning session from the selected work agent");
   }

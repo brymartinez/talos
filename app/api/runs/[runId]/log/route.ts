@@ -4,10 +4,10 @@ import { readFile } from "node:fs/promises";
 import { runIdSchema } from "@/src/domain/types";
 import { apiError, runtime, ServiceError } from "@/src/services/runtime";
 
-export async function GET(_: Request, context: { params: Promise<{ runId: string }> }): Promise<Response> {
+export async function GET(request: Request, context: { params: Promise<{ runId: string }> }): Promise<Response> {
   try {
     const { runId } = await context.params;
-    const { config, database } = runtime();
+    const { config, database } = runtime(request);
     const row = database.query<{ log_path: string | null }, [string]>(
       "SELECT log_path FROM agent_runs WHERE id = ?",
     ).get(runIdSchema.parse(runId));

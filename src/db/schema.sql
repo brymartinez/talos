@@ -103,6 +103,9 @@ CREATE TABLE agent_runs (
 
 CREATE INDEX agent_runs_card_created_idx ON agent_runs(card_id, created_at DESC);
 CREATE INDEX agent_runs_status_idx ON agent_runs(status);
+CREATE UNIQUE INDEX agent_runs_one_active_card_idx
+  ON agent_runs(card_id)
+  WHERE status IN ('queued', 'running');
 
 CREATE TABLE run_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -152,4 +155,4 @@ CREATE TABLE refresh_errors (
   created_at TEXT NOT NULL
 );
 
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;

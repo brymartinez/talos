@@ -14,6 +14,7 @@ export type WorkCardData = Readonly<{
 export type BoardData = Readonly<{
   columns: readonly Stage[];
   cards: readonly WorkCardData[];
+  syncPending: boolean;
   refresh: null | Readonly<{
     id: string; status: string; repositoryCount: number; sourceItemCount: number;
     startedAt: string; finishedAt: string | null;

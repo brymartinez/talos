@@ -70,8 +70,12 @@ export function boardSnapshot(database: Database, config: AppConfig): unknown {
   const errors = refresh ? database.query<{ scope: string; code: string; message: string }, [string]>(
     "SELECT scope, code, message FROM refresh_errors WHERE refresh_run_id = ? ORDER BY id",
   ).all(refresh.id) : [];
+  const syncPending = Boolean(database.query<{ id: string }, []>(
+    "SELECT id FROM queue_jobs WHERE kind = 'sync_github' AND state IN ('pending', 'leased') LIMIT 1",
+  ).get());
   return {
     columns: ["backlog", "planning", "building", "review", "done"], cards,
+    syncPending,
     refresh: refresh ? { id: refresh.id, status: refresh.status, repositoryCount: refresh.repository_count, sourceItemCount: refresh.source_item_count, startedAt: refresh.started_at, finishedAt: refresh.finished_at, errors } : null,
     config: { organization: config.githubOrganization, repositories: config.extraRepositories, workAgent: config.workAgent, concurrency: config.agentConcurrency },
   };

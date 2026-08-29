@@ -10,7 +10,27 @@ export class ServiceError extends Error {
   }
 }
 
-export function runtime(): Readonly<{ config: AppConfig; database: ReturnType<typeof getDatabase> }> {
+function assertLocalRequest(request: Request): void {
+  const url = new URL(request.url);
+  const localHosts = ["localhost", "127.0.0.1", "[::1]"];
+  const hostHeader = request.headers.get("host");
+  let headerHostname = "";
+  try {
+    headerHostname = hostHeader ? new URL(`http://${hostHeader}`).hostname : "";
+  } catch {
+    headerHostname = "";
+  }
+  if (!localHosts.includes(url.hostname) || !localHosts.includes(headerHostname)) {
+    throw new ServiceError("local_access_only", "This app only accepts local requests.", 403);
+  }
+  const origin = request.headers.get("origin");
+  if (origin && origin !== url.origin) {
+    throw new ServiceError("invalid_origin", "Cross-site requests are not allowed.", 403);
+  }
+}
+
+export function runtime(request: Request): Readonly<{ config: AppConfig; database: ReturnType<typeof getDatabase> }> {
+  assertLocalRequest(request);
   const result = getConfigResult();
   if (!result.ok) throw new ServiceError("configuration_error", "The app configuration is incomplete.", 503);
   return { config: result.config, database: getDatabase(result.config) };
