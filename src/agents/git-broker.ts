@@ -27,6 +27,9 @@ const blockedArguments = new Set([
   "--textconv",
   "--open-files-in-pager",
   "--filters",
+  "--output",
+  "--no-index",
+  "--contents",
 ]);
 
 function validateArguments(args: readonly string[]): string | null {
