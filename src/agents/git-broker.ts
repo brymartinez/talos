@@ -11,7 +11,6 @@ const allowedCommands = new Set([
   "diff-index",
   "diff-tree",
   "for-each-ref",
-  "grep",
   "log",
   "ls-files",
   "ls-tree",

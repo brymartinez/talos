@@ -163,10 +163,9 @@ export async function cancelAgentProcess(runId: string): Promise<void> {
   if (!child?.pid) return;
   const cancellation = (async () => {
     terminateProcessTree(child, "SIGTERM");
-    if (!(await waitForExit(child, 2_000))) {
-      terminateProcessTree(child, "SIGKILL");
-      await waitForExit(child, 2_000);
-    }
+    await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, 2_000));
+    terminateProcessTree(child, "SIGKILL");
+    await waitForExit(child, 2_000);
   })();
   activeCancellations.set(runId, cancellation);
   try {

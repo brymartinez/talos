@@ -67,7 +67,7 @@ export async function prepareAgentPolicy(input: Readonly<{
   const gitPath = join(binDirectory, "git");
   const ghPath = join(binDirectory, "gh");
   const gitWrapper = `#!/bin/sh
-response=$(mktemp "$TMPDIR/git-response.XXXXXX") || exit 1
+response=$(mktemp "$TMPDIR/ewb-response.XXXXXX") || exit 1
 trap 'rm -f "$response"' EXIT
 printf '%s\n' "$@" | "${curlExecutable}" --fail-with-body --silent --show-error \
   --header "Authorization: Bearer $ENG_WORK_BOARD_GIT_BROKER_TOKEN" \
@@ -109,6 +109,12 @@ esac
     ? `(allow file-write* (subpath "${quoteSandboxPath(input.cwd)}"))`
     : "";
   const sandboxProfile = join(runDirectory, "agent.sb");
+  const blockedCommandPattern = `(deny process-exec (regex #"/(?:git|git-[^/]+|gh)$"))
+(deny file-read* (regex #"/(?:git|git-[^/]+|gh)$"))
+(allow process-exec (literal "${quoteSandboxPath(gitPath)}"))
+(allow file-read* (literal "${quoteSandboxPath(gitPath)}"))
+(allow process-exec (literal "${quoteSandboxPath(ghPath)}"))
+(allow file-read* (literal "${quoteSandboxPath(ghPath)}"))`;
   await writeFile(
     sandboxProfile,
     `(version 1)
@@ -121,6 +127,7 @@ ${worktreeWriteRule}
 (deny file-write* (literal "${quoteSandboxPath(join(input.cwd, ".git"))}"))
 (deny file-read* (subpath "${quoteSandboxPath(join(homedir(), ".ssh"))}"))
 (deny file-read* (subpath "${quoteSandboxPath(join(homedir(), ".config", "gh"))}"))
+${blockedCommandPattern}
 ${[...blockedExecutables].map(denyExecutable).join("\n")}
 `,
   );
