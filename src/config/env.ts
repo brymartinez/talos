@@ -10,7 +10,7 @@ const repositoryName = z
   .regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/, "must use owner/repository");
 
 const rawEnvironmentSchema = z.object({
-  GITHUB_TOKEN: z.string().trim().min(1, "is required"),
+  ENG_GITHUB_TOKEN: z.string().trim().min(1, "is required"),
   GITHUB_ORG: z.string().trim().min(1, "is required"),
   GITHUB_REPOS: z.string().optional().default(""),
   GITHUB_EXCLUDE_REPOS: z.string().optional().default(""),
@@ -99,7 +99,7 @@ export function parseEnvironment(environment: NodeJS.ProcessEnv): ConfigResult {
   return {
     ok: true,
     config: {
-      githubToken: parsed.data.GITHUB_TOKEN,
+      githubToken: parsed.data.ENG_GITHUB_TOKEN,
       githubOrganization: parsed.data.GITHUB_ORG,
       extraRepositories: included.values,
       excludedRepositories: excluded.values,

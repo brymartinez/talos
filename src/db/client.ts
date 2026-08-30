@@ -10,7 +10,6 @@ function ensureDataDirectories(config: AppConfig): void {
   const directories = [
     config.paths.dataDirectory,
     config.paths.repositoriesDirectory,
-    config.paths.worktreesDirectory,
     config.paths.logsDirectory,
   ];
   for (const directory of directories) {

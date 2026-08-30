@@ -14,7 +14,6 @@ export function getBunDatabase(config: AppConfig): Database {
   for (const directory of [
     config.paths.dataDirectory,
     config.paths.repositoriesDirectory,
-    config.paths.worktreesDirectory,
     config.paths.logsDirectory,
   ]) {
     mkdirSync(directory, { recursive: true, mode: 0o700 });

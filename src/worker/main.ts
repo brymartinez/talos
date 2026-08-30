@@ -37,15 +37,15 @@ async function handle(job: LeasedJob): Promise<void> {
     if (!job.runId) throw new Error("run_stage requires a run");
     return handleRunStage({ database, config, cardId: job.cardId, runId: job.runId, payload: job.payload });
   }
-  const workspace = database.query<{ worktree_path: string }, [typeof job.cardId]>(
-    "SELECT worktree_path FROM workspaces WHERE card_id = ?",
+  const workspace = database.query<{ repository_path: string; worktree_path: string }, [typeof job.cardId]>(
+    "SELECT repository_path, worktree_path FROM workspaces WHERE card_id = ?",
   ).get(job.cardId);
   if (job.kind === "open_vscode") {
     if (!workspace) throw new Error("Card has no workspace yet");
-    return handleOpenVsCode(config, workspace.worktree_path);
+    return handleOpenVsCode(config, workspace.repository_path, workspace.worktree_path);
   }
   const force = Boolean((job.payload as { force?: unknown }).force);
-  return handleDeleteWorktree(database, config, cardIdSchema.parse(job.cardId), force);
+  return handleDeleteWorktree(database, cardIdSchema.parse(job.cardId), force);
 }
 
 const stop = (): void => {

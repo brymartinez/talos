@@ -5,7 +5,6 @@ export type AppPaths = Readonly<{
   dataDirectory: string;
   databaseFile: string;
   repositoriesDirectory: string;
-  worktreesDirectory: string;
   logsDirectory: string;
 }>;
 
@@ -25,7 +24,6 @@ export function deriveAppPaths(appDataDirectory: string): AppPaths {
     dataDirectory,
     databaseFile: join(dataDirectory, "board.sqlite"),
     repositoriesDirectory: join(dataDirectory, "repos"),
-    worktreesDirectory: join(dataDirectory, "worktrees"),
     logsDirectory: join(dataDirectory, "logs"),
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, RotateCcw, Square, Trash2, X } from "lucide-react";
+import { Check, Copy, ExternalLink, RotateCcw, Square, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { WorkCardData } from "@/src/components/board/types";
@@ -15,6 +15,8 @@ export function CardDrawer({ card, onClose, onChanged }: Readonly<{ card: WorkCa
   const [notes, setNotes] = useState(card.notes);
   const [agent, setAgent] = useState(card.workAgent);
   const [message, setMessage] = useState("");
+  const [notesSaved, setNotesSaved] = useState(false);
+  const [commandCopied, setCommandCopied] = useState(false);
   const latest = card.runs[0];
   const canChangeAgent = card.stage === "backlog" || (
     card.stage === "planning" && ["failed", "interrupted", "cancelled"].includes(latest?.status ?? "")
@@ -26,6 +28,14 @@ export function CardDrawer({ card, onClose, onChanged }: Readonly<{ card: WorkCa
     try { await operation(); onChanged(); } catch (error) { setMessage(error instanceof Error ? error.message : "Action failed"); }
   };
   const result = latest?.result;
+  const resumeCommand = latest?.sessionId && card.worktreePath
+    ? `cd ${card.worktreePath} && ${latest.provider === "codex" ? "codex resume" : "claude --resume"} ${latest.sessionId}`
+    : null;
+  const copyResumeCommand = async (command: string): Promise<void> => {
+    await navigator.clipboard.writeText(command);
+    setCommandCopied(true);
+    setTimeout(() => setCommandCopied(false), 2_000);
+  };
   return (
     <div className="drawer-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <aside className="card-drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
@@ -37,9 +47,23 @@ export function CardDrawer({ card, onClose, onChanged }: Readonly<{ card: WorkCa
           const value = event.currentTarget.value;
           if (value === "codex" || value === "claude") setAgent(value);
         }}><option value="codex">Codex</option><option value="claude">Claude Code</option></select></label>
-        <button className="primary-button" type="button" onClick={() => run(() => action(`/api/cards/${card.id}`, "PATCH", { notes, workAgent: agent }))}>Save notes</button>
+        <button className="primary-button" type="button" onClick={() => run(async () => {
+          await action(`/api/cards/${card.id}`, "PATCH", { notes, workAgent: agent });
+          setNotesSaved(true);
+          setTimeout(() => setNotesSaved(false), 2_000);
+        })}>Save notes</button>
+        {notesSaved ? <p className="notes-saved" role="status">Saved</p> : null}
         {latest ? <section className="run-panel">
           <div className="run-heading"><h3>Latest {latest.stage}</h3><StatusBadge status={latest.status} /></div>
+          {latest.sessionId ? <p className="run-session-id">Session <code>{latest.sessionId}</code></p> : null}
+          {resumeCommand ? (
+            <p className="run-session-id">
+              Continue in terminal: <code>{resumeCommand}</code>
+              <button type="button" className="copy-button" onClick={() => copyResumeCommand(resumeCommand)} aria-label="Copy resume command">
+                {commandCopied ? <Check size={13} /> : <Copy size={13} />}
+              </button>
+            </p>
+          ) : null}
           {latest.summary ? <p>{latest.summary}</p> : null}
           {latest.errorMessage ? <p className="action-error">{latest.errorMessage}</p> : null}
           {latest.questions.length ? <div className="run-section"><h4>Questions</h4><ul>{latest.questions.map((question) => <li key={question}>{question}</li>)}</ul></div> : null}
@@ -52,7 +76,7 @@ export function CardDrawer({ card, onClose, onChanged }: Readonly<{ card: WorkCa
           {latest.logUrl ? <a href={latest.logUrl} target="_blank">Open run log</a> : null}
         </section> : null}
         {draft ? <section className="run-panel"><h3>Draft pull request</h3>{draft.prTitle ? <div className="run-section"><h4>Title</h4><p>{draft.prTitle}</p></div> : null}{draft.prDescription ? <div className="run-section"><h4>Description</h4><pre>{draft.prDescription}</pre></div> : null}</section> : null}
-        {card.runs.length ? <section className="run-panel"><h3>Run history</h3><ol className="run-history">{card.runs.map((item) => <li key={item.id}><div className="run-heading"><span>{item.stage} with {item.provider === "claude" ? "Claude Code" : "Codex"}</span><StatusBadge status={item.status} /></div>{item.summary ? <p>{item.summary}</p> : null}{item.errorMessage ? <p className="action-error">{item.errorMessage}</p> : null}<small>{new Date(item.createdAt).toLocaleString()}</small>{item.logUrl ? <a href={item.logUrl} target="_blank">Open log</a> : null}</li>)}</ol></section> : null}
+        {card.runs.length ? <section className="run-panel"><h3>Run history</h3><ol className="run-history">{card.runs.map((item) => <li key={item.id}><div className="run-heading"><span>{item.stage} with {item.provider === "claude" ? "Claude Code" : "Codex"}</span><StatusBadge status={item.status} /></div>{item.sessionId ? <p className="run-session-id">Session <code>{item.sessionId}</code></p> : null}{item.summary ? <p>{item.summary}</p> : null}{item.errorMessage ? <p className="action-error">{item.errorMessage}</p> : null}<small>{new Date(item.createdAt).toLocaleString()}</small>{item.logUrl ? <a href={item.logUrl} target="_blank">Open log</a> : null}</li>)}</ol></section> : null}
         <div className="drawer-actions">
           <button type="button" onClick={() => run(() => action(`/api/cards/${card.id}/retry`))}><RotateCcw size={15} />Retry</button>
           <button type="button" onClick={() => run(() => action(`/api/cards/${card.id}/cancel`))}><Square size={15} />Cancel</button>

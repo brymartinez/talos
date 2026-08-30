@@ -31,7 +31,7 @@ cp .env.example .env
 Set these required values in `.env`:
 
 ```dotenv
-GITHUB_TOKEN=github_pat_...
+ENG_GITHUB_TOKEN=github_pat_...
 GITHUB_ORG=your-organization
 WORK_AGENT=codex
 ```

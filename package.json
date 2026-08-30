@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "bun run scripts/dev.ts",
-    "dev:web": "next dev -H 127.0.0.1",
+    "dev:web": "next dev -H 127.0.0.1 -p 5678",
     "worker": "bun run src/worker/main.ts",
     "build": "next build",
     "start": "bun run scripts/start.ts",

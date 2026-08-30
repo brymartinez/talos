@@ -67,13 +67,6 @@ export function moveCard(database: Database, rawCardId: string, input: unknown):
   const card = loadCard(database, cardId);
   if (!canMoveCard(card, destination)) throw new ServiceError("invalid_move", "That stage move is not allowed.", 409);
   const forward = isForwardMove(card, destination);
-  if (forward && card.stage !== "backlog" && card.activeRunState !== "succeeded") {
-    throw new ServiceError(
-      "stage_not_ready",
-      "Finish the current stage successfully before moving this card forward.",
-      409,
-    );
-  }
   const runId = forward ? newRunId() : undefined;
   database.transaction(() => {
     if (runId) {

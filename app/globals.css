@@ -294,12 +294,21 @@ textarea:focus-visible {
   border-radius: 12px;
   background: var(--background);
   box-shadow: 0 7px 20px rgb(0 0 0 / 16%);
+  cursor: grab;
+}
+
+.work-card[aria-disabled="true"] {
+  cursor: default;
 }
 
 .work-card.dragging {
-  z-index: 10;
+  opacity: 0;
+}
+
+.work-card.overlay {
+  cursor: grabbing;
   border-color: var(--pink);
-  opacity: 0.85;
+  box-shadow: 0 14px 34px rgb(0 0 0 / 28%);
 }
 
 .card-open {
@@ -347,8 +356,36 @@ textarea:focus-visible {
   color: var(--foreground);
 }
 
+.card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card-editor-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--cyan);
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+.card-editor-link:hover {
+  border-color: var(--cyan);
+}
+
 .status-badge {
   display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin-top: 10px;
   padding: 4px 7px;
   border: 1px solid var(--border);
@@ -357,6 +394,16 @@ textarea:focus-visible {
   font-size: 0.68rem;
   font-weight: 750;
   text-transform: capitalize;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
 }
 
 .status-failed,
@@ -373,15 +420,6 @@ textarea:focus-visible {
   color: var(--yellow);
 }
 
-.drag-handle {
-  position: absolute;
-  right: 9px;
-  bottom: 9px;
-  padding: 3px 6px;
-  border: 0;
-  color: var(--muted);
-  font-size: 0.66rem;
-}
 
 .empty-column {
   margin: 25px 0;
@@ -394,6 +432,12 @@ textarea:focus-visible {
 .board-error,
 .action-error {
   color: var(--red);
+}
+
+.notes-saved {
+  margin: -8px 0 0;
+  color: var(--green);
+  font-size: 0.78rem;
 }
 
 .board-error,
@@ -489,6 +533,38 @@ textarea:focus-visible {
 
 .run-section {
   margin-top: 18px;
+}
+
+.run-session-id {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.run-session-id code {
+  user-select: all;
+}
+
+.copy-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.copy-button:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
 }
 
 .run-section ul {

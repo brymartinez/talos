@@ -3,20 +3,27 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Bot, CircleDot, GitPullRequest, LockKeyhole } from "lucide-react";
+import { Bot, CircleDot, Code2, GitPullRequest, LockKeyhole } from "lucide-react";
 
 import type { WorkCardData } from "@/src/components/board/types";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 
+function openVsCode(cardId: string): void {
+  void fetch(`/api/cards/${cardId}/open-vscode`, { method: "POST" });
+}
+
 export function WorkCard({ card, onOpen }: Readonly<{ card: WorkCardData; onOpen: () => void }>) {
   const activeRun = card.runs[0];
   const locked = activeRun?.status === "queued" || activeRun?.status === "running";
+  const canOpenEditor = card.stage === "building" || card.stage === "review";
   const sortable = useSortable({ id: card.id, data: { card }, disabled: locked || card.stage === "done" });
   return (
     <article
       ref={sortable.setNodeRef}
       style={{ transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition }}
       className={`work-card${sortable.isDragging ? " dragging" : ""}`}
+      {...sortable.attributes}
+      {...sortable.listeners}
     >
       <button className="card-open" type="button" onClick={onOpen} aria-label={`Open ${card.title}`}>
         <span className="card-repository">{card.repository} · #{card.number}</span>
@@ -31,10 +38,19 @@ export function WorkCard({ card, onOpen }: Readonly<{ card: WorkCardData; onOpen
         {card.matchReasons.slice(0, 2).map((reason) => <span key={reason}>{reason.replaceAll("_", " ")}</span>)}
       </div>
       {card.noLongerAssigned ? <p className="card-warning">No longer assigned</p> : null}
-      {activeRun ? <StatusBadge status={activeRun.status} /> : null}
-      <button className="drag-handle" type="button" {...sortable.attributes} {...sortable.listeners} disabled={locked} aria-label={`Move ${card.title}`}>
-        Drag
-      </button>
+      <div className="card-footer">
+        {activeRun ? <StatusBadge status={activeRun.status} /> : null}
+        {canOpenEditor ? (
+          <button
+            className="card-editor-link"
+            type="button"
+            onClick={(event) => { event.stopPropagation(); openVsCode(card.id); }}
+            aria-label={`Open ${card.title} in VS Code`}
+          >
+            <Code2 size={13} /> Open in editor
+          </button>
+        ) : null}
+      </div>
     </article>
   );
 }

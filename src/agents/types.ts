@@ -2,6 +2,13 @@ import { z } from "zod";
 
 import type { AgentProvider, RunId, Stage } from "@/src/domain/types";
 
+const findingSchema = z.union([z.string(), z.record(z.string(), z.unknown())]).transform((value) => {
+  if (typeof value === "string") return value;
+  return Object.values(value)
+    .filter((part): part is string | number => typeof part === "string" || typeof part === "number")
+    .join(" ");
+});
+
 export const agentResultSchema = z.object({
   summary: z.string(),
   blockers: z.array(z.string()).default([]),
@@ -9,7 +16,7 @@ export const agentResultSchema = z.object({
   plan: z.array(z.object({ file: z.string(), change: z.string() })).default([]),
   changedFiles: z.array(z.string()).default([]),
   checks: z.array(z.object({ command: z.string(), result: z.string() })).default([]),
-  findings: z.array(z.string()).default([]),
+  findings: z.array(findingSchema).default([]),
   verdict: z.string().optional(),
   prTitle: z.string().optional(),
   prDescription: z.string().optional(),

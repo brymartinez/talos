@@ -134,6 +134,16 @@ export async function* streamAgentProcess(input: Readonly<{
   child.once("exit", (code) => {
     processExit = code ?? 1;
     notify();
+    // A tool the agent ran can leave an orphaned descendant holding the stdout/stderr
+    // pipes open even after the main process exits, which would otherwise hang this
+    // generator forever. Give buffered output a few seconds to flush, then force it.
+    const grace = setTimeout(() => {
+      if (openReaders > 0) {
+        child.stdout.destroy();
+        child.stderr.destroy();
+      }
+    }, 5_000);
+    grace.unref?.();
   });
 
   try {

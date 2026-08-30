@@ -80,8 +80,7 @@ export async function handleRunStage(input: Readonly<{
         `SELECT agent_sessions.id, agent_sessions.provider_session_id
          FROM agent_runs JOIN agent_sessions ON agent_sessions.id = agent_runs.session_id
          WHERE agent_runs.card_id = ? AND agent_runs.stage = 'planning'
-           AND agent_runs.status = 'succeeded' AND agent_sessions.provider = ?
-           AND agent_sessions.provider_session_id IS NOT NULL
+           AND agent_sessions.provider = ? AND agent_sessions.provider_session_id IS NOT NULL
          ORDER BY agent_runs.created_at DESC LIMIT 1`,
       ).get(cardId, provider)
     : stage === "planning"
@@ -134,7 +133,12 @@ export async function handleRunStage(input: Readonly<{
     input.database.query<unknown, [typeof runId, string, string, string]>(
       "INSERT INTO run_events (run_id, kind, payload_json, created_at) VALUES (?, ?, ?, ?)",
     ).run(runId, event.kind, JSON.stringify(event), new Date().toISOString());
-    if (event.kind === "session") providerSessionId = event.sessionId;
+    if (event.kind === "session" && event.sessionId !== providerSessionId) {
+      providerSessionId = event.sessionId;
+      input.database.query<unknown, [string, string, string]>(
+        "UPDATE agent_sessions SET provider_session_id = ?, updated_at = ? WHERE id = ?",
+      ).run(providerSessionId, new Date().toISOString(), sessionId);
+    }
     if (event.kind === "result") result = event.result;
     if (event.kind === "completed") exitCode = event.exitCode;
   }

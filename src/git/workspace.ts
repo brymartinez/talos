@@ -1,5 +1,5 @@
 import { mkdir, stat } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 
 import type { Database } from "@/src/db/sqlite";
 
@@ -33,6 +33,10 @@ export type CardWorkspace = Readonly<{
   beforeState: GitState;
 }>;
 
+export function worktreeRoot(repositoryPath: string): string {
+  return join(repositoryPath, ".worktree");
+}
+
 const repositoryLocks = new Map<string, Promise<void>>();
 
 async function serialized<T>(key: string, operation: () => Promise<T>): Promise<T> {
@@ -54,6 +58,10 @@ async function serialized<T>(key: string, operation: () => Promise<T>): Promise<
 
 function slug(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 42) || "work";
+}
+
+function worktreeName(source: WorkspaceSource): string {
+  return `${source.githubNumber}-${slug(source.title)}`;
 }
 
 function reviewOnly(source: WorkspaceSource): boolean {
@@ -97,8 +105,8 @@ export async function createCardWorkspace(
   config: AppConfig,
 ): Promise<CardWorkspace> {
   const repositoryPath = await resolveRepository(source, config);
-  const worktreePath = join(config.paths.worktreesDirectory, source.cardId);
-  await mkdir(config.paths.worktreesDirectory, { recursive: true });
+  const worktreePath = join(worktreeRoot(repositoryPath), worktreeName(source));
+  await mkdir(worktreeRoot(repositoryPath), { recursive: true });
   return serialized(source.repositoryName, async () => {
     let worktreeExists = false;
     try {
@@ -153,12 +161,8 @@ export async function createCardWorkspace(
 export async function deleteCardWorkspace(input: Readonly<{
   repositoryPath: string;
   worktreePath: string;
-  expectedWorktreePath: string;
   force: boolean;
 }>): Promise<void> {
-  if (resolve(input.worktreePath) !== resolve(input.expectedWorktreePath)) {
-    throw new Error("Workspace path does not match the saved card workspace");
-  }
   const status = await runGit({ args: ["status", "--porcelain=v1"], cwd: input.worktreePath });
   if (status.stdout && !input.force) {
     throw new Error("Workspace has uncommitted changes. Confirm forced deletion first.");
