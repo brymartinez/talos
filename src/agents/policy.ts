@@ -100,10 +100,14 @@ esac
     "/usr/bin/ssh",
     "/usr/bin/xcrun",
   ]);
+  // The Claude Code CLI derives its own scratchpad directory from cwd under
+  // /private/tmp/claude-<uid>/... regardless of the TMPDIR we inject above, so the
+  // sandbox must allow writes there directly or every run's mkdir gets EPERM.
   const providerWriteRules = input.provider === "codex"
     ? `(allow file-write* (subpath "${quoteSandboxPath(join(homedir(), ".codex"))}"))`
     : `(allow file-write* (subpath "${quoteSandboxPath(join(homedir(), ".claude"))}"))
-(allow file-write* (literal "${quoteSandboxPath(join(homedir(), ".claude.json"))}"))`;
+(allow file-write* (literal "${quoteSandboxPath(join(homedir(), ".claude.json"))}"))
+(allow file-write* (subpath "${quoteSandboxPath(join("/private/tmp", `claude-${process.getuid()}`))}"))`;
   const worktreeWriteRule = input.stage === "building"
     ? `(allow file-write* (subpath "${quoteSandboxPath(input.cwd)}"))`
     : "";
