@@ -6,7 +6,7 @@ import { z } from "zod";
 import { ClaudeRunner } from "@/src/agents/claude";
 import { CodexRunner } from "@/src/agents/codex";
 import { enforceStagePolicy } from "@/src/agents/policy";
-import { stagePrompt } from "@/src/agents/prompts";
+import { resumeCheckInPrompt, stagePrompt } from "@/src/agents/prompts";
 import type { AgentResult, AgentRunner } from "@/src/agents/types";
 import type { AppConfig } from "@/src/config/env";
 import { getCardWorkSource, saveRepositoryPath } from "@/src/db/repositories";
@@ -20,6 +20,8 @@ type RunContext = Readonly<{
   body: string;
   notes: string;
   work_agent: AgentProvider;
+  item_type: "issue" | "pull_request";
+  github_number: number;
 }>;
 type WorkspaceRow = Readonly<{
   repository_path: string;
@@ -46,7 +48,8 @@ export async function handleRunStage(input: Readonly<{
   const runId = runIdSchema.parse(input.runId);
   const { stage } = payloadSchema.parse(input.payload);
   const context = input.database.query<RunContext, [typeof cardId]>(
-    `SELECT source_items.title, source_items.body, cards.notes, cards.work_agent
+    `SELECT source_items.title, source_items.body, cards.notes, cards.work_agent,
+            source_items.item_type, source_items.github_number
      FROM cards JOIN source_items ON source_items.id = cards.source_item_id WHERE cards.id = ?`,
   ).get(cardId);
   if (!context) throw new Error("Card does not exist");
@@ -96,6 +99,17 @@ export async function handleRunStage(input: Readonly<{
   if (stage === "building" && !priorSession) {
     throw new Error("Building requires a successful Planning session from the selected work agent");
   }
+  // priorSession for "building" is always set (it's how Building inherits Planning's
+  // session), even on the very first Building attempt — that first attempt still needs
+  // the full task prompt, not a check-in. Only an actual retry of this same stage (a
+  // prior run already exists for it) should get the shorter "what's your status" prompt.
+  const isRetryAtThisStage = stage === "building"
+    ? Boolean(
+        input.database.query<{ id: string }, [typeof cardId, typeof runId]>(
+          "SELECT id FROM agent_runs WHERE card_id = ? AND stage = 'building' AND id <> ? LIMIT 1",
+        ).get(cardId, runId),
+      )
+    : Boolean(priorSession);
   const sessionId = priorSession?.id ?? crypto.randomUUID();
   if (!priorSession) {
     input.database.query<unknown, [string, typeof cardId, AgentProvider, "work" | "review", string, string]>(
@@ -107,13 +121,22 @@ export async function handleRunStage(input: Readonly<{
      WHERE id = ? AND status = 'queued'`,
   ).run(sessionId, provider, timestamp, timestamp, runId);
   if (started.changes !== 1) throw new Error("Run is no longer queued");
-  const prompt = stagePrompt({
-    stage,
-    title: context.title,
-    body: context.body,
-    notes: context.notes,
-    priorResult,
-  });
+  const prompt = isRetryAtThisStage
+    ? resumeCheckInPrompt({
+        stage,
+        notes: context.notes,
+        itemType: context.item_type,
+        githubNumber: context.github_number,
+      })
+    : stagePrompt({
+        stage,
+        title: context.title,
+        body: context.body,
+        notes: context.notes,
+        priorResult,
+        itemType: context.item_type,
+        githubNumber: context.github_number,
+      });
   const before = await captureGitState(workspace.worktree_path);
   let result: AgentResult | null = null;
   let providerSessionId: string | null = null;
@@ -145,7 +168,7 @@ export async function handleRunStage(input: Readonly<{
   const after = await captureGitState(workspace.worktree_path);
   enforceStagePolicy({ stage, before, after });
   const finished = new Date().toISOString();
-  const status = exitCode === 0 && result ? (result.questions.length ? "needs_input" : "succeeded") : "failed";
+  const status = exitCode === 0 && result ? result.outcome : "failed";
   input.database.transaction(() => {
     input.database.query<
       unknown,

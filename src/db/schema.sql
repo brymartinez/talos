@@ -89,7 +89,7 @@ CREATE TABLE agent_runs (
   session_id TEXT REFERENCES agent_sessions(id) ON DELETE SET NULL,
   stage TEXT NOT NULL CHECK (stage IN ('planning', 'building', 'review')),
   provider TEXT NOT NULL CHECK (provider IN ('codex', 'claude')),
-  status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'needs_input', 'cancelled', 'interrupted')),
+  status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'needs_input', 'changes_requested', 'cancelled', 'interrupted')),
   summary TEXT,
   result_json TEXT,
   questions_json TEXT,
@@ -155,4 +155,4 @@ CREATE TABLE refresh_errors (
   created_at TEXT NOT NULL
 );
 
-PRAGMA user_version = 2;
+PRAGMA user_version = 3;

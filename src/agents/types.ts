@@ -10,6 +10,7 @@ const findingSchema = z.union([z.string(), z.record(z.string(), z.unknown())]).t
 });
 
 export const agentResultSchema = z.object({
+  outcome: z.enum(["succeeded", "needs_input", "changes_requested"]),
   summary: z.string(),
   blockers: z.array(z.string()).default([]),
   questions: z.array(z.string()).default([]),

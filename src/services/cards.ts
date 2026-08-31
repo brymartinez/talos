@@ -94,12 +94,6 @@ export function retryCard(database: Database, rawCardId: string): void {
   if (card.activeRunState === "queued" || card.activeRunState === "running") {
     throw new ServiceError("run_active", "This card already has queued or running work.", 409);
   }
-  const prior = database.query<{ status: RunState; finished_at: string | null }, [CardId]>(
-    "SELECT status, finished_at FROM agent_runs WHERE card_id = ? ORDER BY created_at DESC LIMIT 1",
-  ).get(cardId);
-  if (prior?.status === "needs_input" && (!card.notesUpdatedAt || !prior.finished_at || card.notesUpdatedAt <= prior.finished_at)) {
-    throw new ServiceError("notes_required", "Update the card notes before retrying.", 409);
-  }
   const runId = newRunId();
   const timestamp = new Date().toISOString();
   database.transaction(() => {

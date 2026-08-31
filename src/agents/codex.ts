@@ -33,9 +33,15 @@ export class CodexRunner implements AgentRunner {
     const policy = await prepareAgentPolicy({ ...input, provider: this.provider });
     const command = Bun.which("codex");
     if (!command) throw new Error("Codex CLI is not installed");
+    // Codex's own sandbox mode calls sandbox_init() a second time on macOS, nested inside
+    // the sandbox-exec profile we already apply below — the OS rejects that with
+    // "sandbox_apply: Operation not permitted". This flag is Codex's documented escape
+    // hatch for exactly that ("environments that are externally sandboxed"); our own
+    // profile already enforces the real restrictions (no git commit, worktree-scoped
+    // writes), so Codex's internal sandbox would only be redundant here anyway.
     const providerArgs = sessionId
-      ? ["exec", "resume", "--json", "-c", `sandbox_mode=\"${policy.sandbox}\"`, sessionId, "-"]
-      : ["exec", "--json", "--sandbox", policy.sandbox, "-C", input.cwd, "-"];
+      ? ["exec", "resume", "--json", "--dangerously-bypass-approvals-and-sandbox", sessionId, "-"]
+      : ["exec", "--json", "--dangerously-bypass-approvals-and-sandbox", "-C", input.cwd, "-"];
     const args = ["-f", policy.sandboxProfile, command, ...providerArgs];
     yield* streamAgentProcess({
       ...input,

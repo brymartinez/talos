@@ -45,7 +45,6 @@ export async function prepareAgentPolicy(input: Readonly<{
   provider: AgentProvider;
 }>): Promise<Readonly<{
   environment: NodeJS.ProcessEnv;
-  sandbox: "read-only" | "workspace-write";
   sandboxExecutable: string;
   sandboxProfile: string;
 }>> {
@@ -152,7 +151,6 @@ ${[...blockedExecutables].map(denyExecutable).join("\n")}
   environment.PATH = `${binDirectory}${delimiter}${environment.PATH ?? ""}`;
   return {
     environment,
-    sandbox: input.stage === "building" ? "workspace-write" : "read-only",
     sandboxExecutable,
     sandboxProfile,
   };

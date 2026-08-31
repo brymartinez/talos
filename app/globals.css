@@ -416,7 +416,8 @@ textarea:focus-visible {
   color: var(--green);
 }
 
-.status-needs-input {
+.status-needs-input,
+.status-changes-requested {
   color: var(--yellow);
 }
 

@@ -17,11 +17,12 @@ export function CardDrawer({ card, onClose, onChanged }: Readonly<{ card: WorkCa
   const [message, setMessage] = useState("");
   const [notesSaved, setNotesSaved] = useState(false);
   const [commandCopied, setCommandCopied] = useState(false);
+  const [prCopied, setPrCopied] = useState(false);
   const latest = card.runs[0];
   const canChangeAgent = card.stage === "backlog" || (
     card.stage === "planning" && ["failed", "interrupted", "cancelled"].includes(latest?.status ?? "")
   );
-  const draft = card.runs.find((run) => run.result?.prTitle || run.result?.prDescription)?.result;
+  const draft = card.runs.find((run) => run.stage === "building" && run.status === "succeeded" && (run.result?.prTitle || run.result?.prDescription))?.result;
   useEffect(() => { document.getElementById("drawer-close")?.focus(); }, []);
   const run = async (operation: () => Promise<void>): Promise<void> => {
     setMessage("");
@@ -35,6 +36,11 @@ export function CardDrawer({ card, onClose, onChanged }: Readonly<{ card: WorkCa
     await navigator.clipboard.writeText(command);
     setCommandCopied(true);
     setTimeout(() => setCommandCopied(false), 2_000);
+  };
+  const copyPrDraft = async (text: string): Promise<void> => {
+    await navigator.clipboard.writeText(text);
+    setPrCopied(true);
+    setTimeout(() => setPrCopied(false), 2_000);
   };
   return (
     <div className="drawer-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -75,7 +81,21 @@ export function CardDrawer({ card, onClose, onChanged }: Readonly<{ card: WorkCa
           {result?.verdict ? <div className="run-section"><h4>Verdict</h4><p>{result.verdict}</p></div> : null}
           {latest.logUrl ? <a href={latest.logUrl} target="_blank">Open run log</a> : null}
         </section> : null}
-        {draft ? <section className="run-panel"><h3>Draft pull request</h3>{draft.prTitle ? <div className="run-section"><h4>Title</h4><p>{draft.prTitle}</p></div> : null}{draft.prDescription ? <div className="run-section"><h4>Description</h4><pre>{draft.prDescription}</pre></div> : null}</section> : null}
+        {draft ? <section className="run-panel">
+          <div className="run-heading">
+            <h3>Draft pull request</h3>
+            <button
+              type="button"
+              className="copy-button"
+              aria-label="Copy PR title and description"
+              onClick={() => copyPrDraft([draft.prTitle, draft.prDescription].filter(Boolean).join("\n\n"))}
+            >
+              {prCopied ? <Check size={13} /> : <Copy size={13} />}
+            </button>
+          </div>
+          {draft.prTitle ? <div className="run-section"><h4>Title</h4><p>{draft.prTitle}</p></div> : null}
+          {draft.prDescription ? <div className="run-section"><h4>Description</h4><pre>{draft.prDescription}</pre></div> : null}
+        </section> : null}
         {card.runs.length ? <section className="run-panel"><h3>Run history</h3><ol className="run-history">{card.runs.map((item) => <li key={item.id}><div className="run-heading"><span>{item.stage} with {item.provider === "claude" ? "Claude Code" : "Codex"}</span><StatusBadge status={item.status} /></div>{item.sessionId ? <p className="run-session-id">Session <code>{item.sessionId}</code></p> : null}{item.summary ? <p>{item.summary}</p> : null}{item.errorMessage ? <p className="action-error">{item.errorMessage}</p> : null}<small>{new Date(item.createdAt).toLocaleString()}</small>{item.logUrl ? <a href={item.logUrl} target="_blank">Open log</a> : null}</li>)}</ol></section> : null}
         <div className="drawer-actions">
           <button type="button" onClick={() => run(() => action(`/api/cards/${card.id}/retry`))}><RotateCcw size={15} />Retry</button>

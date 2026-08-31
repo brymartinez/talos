@@ -57,7 +57,13 @@ export function boardSnapshot(database: Database, config: AppConfig): unknown {
     list.push({
       id: run.id, stage: stageSchema.parse(run.stage), provider: run.provider,
       status: runStateSchema.parse(run.status), summary: run.summary,
-      result: run.result_json ? agentResultSchema.parse(JSON.parse(run.result_json)) : null,
+      // Runs recorded before "outcome" existed have no such field in their stored JSON;
+      // fall back to the status we already derived for them at the time (which the
+      // enum's possible values still cover, since a run only ever gets a result_json
+      // when it succeeded, needed input, or had changes requested).
+      result: run.result_json
+        ? agentResultSchema.parse({ outcome: run.status, ...JSON.parse(run.result_json) })
+        : null,
       questions: JSON.parse(run.questions_json ?? "[]"), errorMessage: run.error_message,
       logUrl: run.log_path ? `/api/runs/${run.id}/log` : null,
       sessionId: run.provider_session_id,
