@@ -8,10 +8,14 @@ const repositoryName = z
   .string()
   .trim()
   .regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/, "must use owner/repository");
+const organizationName = z
+  .string()
+  .trim()
+  .regex(/^[A-Za-z0-9_.-]+$/, "must use an organization name");
 
 const rawEnvironmentSchema = z.object({
   ENG_GITHUB_TOKEN: z.string().trim().min(1, "is required"),
-  GITHUB_ORG: z.string().trim().min(1, "is required"),
+  GITHUB_ORGS: z.string().optional().default(""),
   GITHUB_REPOS: z.string().optional().default(""),
   GITHUB_EXCLUDE_REPOS: z.string().optional().default(""),
   GITHUB_TEAM_ALLOWLIST: z.string().optional().default(""),
@@ -25,8 +29,8 @@ const rawEnvironmentSchema = z.object({
 
 export type AppConfig = Readonly<{
   githubToken: string;
-  githubOrganization: string;
-  extraRepositories: readonly string[];
+  githubOrganizations: readonly string[];
+  githubRepositories: readonly string[];
   excludedRepositories: readonly string[];
   teamAllowlist: readonly string[];
   mentionLookbackDays: number;
@@ -67,7 +71,23 @@ function parseRepositories(
       errors.push({ field, message: `${entry} must use owner/repository` });
     }
   }
-  return { values, errors };
+  return { values: [...new Set(values)], errors };
+}
+
+function parseOrganizations(
+  value: string,
+): Readonly<{ values: readonly string[]; errors: readonly ConfigError[] }> {
+  const values: string[] = [];
+  const errors: ConfigError[] = [];
+  for (const entry of parseList(value)) {
+    const parsed = organizationName.safeParse(entry);
+    if (parsed.success) {
+      values.push(parsed.data.toLowerCase());
+    } else {
+      errors.push({ field: "GITHUB_ORGS", message: `${entry} must use an organization name` });
+    }
+  }
+  return { values: [...new Set(values)], errors };
 }
 
 function fieldName(path: PropertyKey[]): string {
@@ -86,22 +106,32 @@ export function parseEnvironment(environment: NodeJS.ProcessEnv): ConfigResult {
     };
   }
 
+  const organizations = parseOrganizations(parsed.data.GITHUB_ORGS);
   const included = parseRepositories("GITHUB_REPOS", parsed.data.GITHUB_REPOS);
   const excluded = parseRepositories(
     "GITHUB_EXCLUDE_REPOS",
     parsed.data.GITHUB_EXCLUDE_REPOS,
   );
-  const repositoryErrors = [...included.errors, ...excluded.errors];
+  const repositoryErrors = [...organizations.errors, ...included.errors, ...excluded.errors];
   if (repositoryErrors.length > 0) {
     return { ok: false, errors: repositoryErrors };
+  }
+  if (organizations.values.length === 0 && included.values.length === 0) {
+    return {
+      ok: false,
+      errors: [{
+        field: "GITHUB_ORGS/GITHUB_REPOS",
+        message: "at least one organization or repository is required",
+      }],
+    };
   }
 
   return {
     ok: true,
     config: {
       githubToken: parsed.data.ENG_GITHUB_TOKEN,
-      githubOrganization: parsed.data.GITHUB_ORG,
-      extraRepositories: included.values,
+      githubOrganizations: organizations.values,
+      githubRepositories: included.values,
       excludedRepositories: excluded.values,
       teamAllowlist: parseList(parsed.data.GITHUB_TEAM_ALLOWLIST),
       mentionLookbackDays: parsed.data.GITHUB_MENTION_LOOKBACK_DAYS,

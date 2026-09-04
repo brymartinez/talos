@@ -312,6 +312,29 @@ type ReconcileInput = Readonly<{
 export function reconcileSourceItems(database: Database, input: ReconcileInput): void {
   database.transaction(() => {
     const timestamp = now();
+    if (input.allowStaleReconciliation) {
+      const repositoryIds = input.repositories.map((repository) => repository.id);
+      if (repositoryIds.length === 0) {
+        database
+          .query<unknown, [string]>(
+            "UPDATE cards SET archived = 1, updated_at = ? WHERE archived = 0",
+          )
+          .run(timestamp);
+      } else {
+        const placeholders = repositoryIds.map(() => "?").join(", ");
+        database
+          .query<unknown, string[]>(
+            `UPDATE cards
+             SET archived = 1, updated_at = ?
+             WHERE archived = 0
+               AND source_item_id IN (
+                 SELECT id FROM source_items
+                 WHERE repository_id NOT IN (${placeholders})
+               )`,
+          )
+          .run(timestamp, ...repositoryIds);
+      }
+    }
     for (const repository of input.repositories) {
       database
         .query<

@@ -32,10 +32,10 @@ A source item is one GitHub issue or pull request. The dashboard stores one card
 
 A manual GitHub refresh performs these actions:
 
-- Read accessible repositories from `GITHUB_ORG`.
-- Add repositories from `GITHUB_REPOS`.
+- Read accessible repositories from every organization in `GITHUB_ORGS`.
+- Add every repository in `GITHUB_REPOS`.
 - Remove repositories from `GITHUB_EXCLUDE_REPOS`.
-- Find assigned issues, assigned pull requests, authored pull requests, direct review requests, team review requests, and mentions updated within the last 90 days.
+- Find assigned or authored issues, assigned pull requests, authored pull requests, direct review requests, team review requests, and mentions updated within the last 90 days.
 - Add new cards to the top of Backlog.
 - Archive a stale card if it is still in Backlog.
 - Mark a stale active card as **No longer assigned**.

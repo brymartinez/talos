@@ -8,9 +8,9 @@ export type SourceQuery = Readonly<{
 
 type SourceQueryInput = Readonly<{
   username: string;
-  organization: string;
-  extraRepositories: readonly string[];
-  teams: readonly string[];
+  organizations: readonly string[];
+  repositories: readonly string[];
+  teams: readonly Readonly<{ organization: string; slug: string }>[];
   mentionLookbackDays: number;
 }>;
 
@@ -20,10 +20,21 @@ function dateDaysAgo(days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-function scopedQueries(base: string, input: SourceQueryInput): readonly string[] {
+type SourceScope = Readonly<{ owner: string; qualifier: string }>;
+
+function sourceScopes(input: SourceQueryInput): readonly SourceScope[] {
+  const organizations = new Set(input.organizations);
   return [
-    `${base} org:${input.organization}`,
-    ...input.extraRepositories.map((repository) => `${base} repo:${repository}`),
+    ...input.organizations.map((organization) => ({
+      owner: organization,
+      qualifier: `org:${organization}`,
+    })),
+    ...input.repositories
+      .filter((repository) => !organizations.has(repository.split("/")[0] ?? ""))
+      .map((repository) => ({
+        owner: repository.split("/")[0] ?? "",
+        qualifier: `repo:${repository}`,
+      })),
   ];
 }
 
@@ -31,6 +42,7 @@ export function buildSourceQueries(input: SourceQueryInput): readonly SourceQuer
   const definitions: readonly Readonly<{ reason: MatchReason; base: string }>[] = [
     { reason: "assigned", base: `is:issue is:open assignee:${input.username}` },
     { reason: "assigned", base: `is:pr is:open assignee:${input.username}` },
+    { reason: "authored", base: `is:issue is:open author:${input.username}` },
     { reason: "authored", base: `is:pr is:open author:${input.username}` },
     {
       reason: "review_requested",
@@ -43,8 +55,10 @@ export function buildSourceQueries(input: SourceQueryInput): readonly SourceQuer
   ];
 
   const results: SourceQuery[] = [];
+  const scopes = sourceScopes(input);
   for (const definition of definitions) {
-    for (const query of scopedQueries(definition.base, input)) {
+    for (const scope of scopes) {
+      const query = `${definition.base} ${scope.qualifier}`;
       results.push({
         reason: definition.reason,
         query,
@@ -53,8 +67,9 @@ export function buildSourceQueries(input: SourceQueryInput): readonly SourceQuer
     }
   }
   for (const team of input.teams) {
-    const base = `is:pr is:open team-review-requested:${input.organization}/${team}`;
-    for (const query of scopedQueries(base, input)) {
+    const base = `is:pr is:open team-review-requested:${team.organization}/${team.slug}`;
+    for (const scope of scopes.filter((candidate) => candidate.owner === team.organization)) {
+      const query = `${base} ${scope.qualifier}`;
       results.push({ reason: "team_review_requested", query, scope: query });
     }
   }

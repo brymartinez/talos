@@ -80,7 +80,10 @@ export function BoardClient() {
   return (
     <>
       <FilterBar repositories={repositories} repository={repository} query={query} itemType={itemType} reason={reason} status={status} busy={board.syncPending || board.refresh?.status === "running"} onFilter={setFilter} onSync={() => void request("/api/sync").catch((reason: Error) => setError(reason.message))} />
-      <div className="board-summary"><span>{board.config.organization}</span><span>{visible.length} open items</span><span>Agent limit {board.config.concurrency}</span>{board.refresh?.finishedAt ? <span>Updated {new Date(board.refresh.finishedAt).toLocaleTimeString()}</span> : <span>Not synced yet</span>}</div>
+      <div className="board-summary"><span>{[
+        ...board.config.organizations.map((organization) => `org:${organization}`),
+        ...board.config.repositories.map((configuredRepository) => `repo:${configuredRepository}`),
+      ].join(", ")}</span><span>{visible.length} open items</span><span>Agent limit {board.config.concurrency}</span>{board.refresh?.finishedAt ? <span>Updated {new Date(board.refresh.finishedAt).toLocaleTimeString()}</span> : <span>Not synced yet</span>}</div>
       {error ? <p className="board-error" role="alert">{error}</p> : null}
       {board.refresh?.errors.length ? <details className="refresh-errors"><summary>{board.refresh.errors.length} refresh warnings</summary><ul>{board.refresh.errors.map((item) => <li key={`${item.scope}-${item.code}`}>{item.scope}: {item.message}</li>)}</ul></details> : null}
       <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={dragStart} onDragEnd={(event) => void dragEnd(event)} onDragCancel={() => setActiveCard(null)}>

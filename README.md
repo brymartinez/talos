@@ -32,22 +32,28 @@ Set these required values in `.env`:
 
 ```dotenv
 ENG_GITHUB_TOKEN=github_pat_...
-GITHUB_ORG=your-organization
 WORK_AGENT=codex
 ```
 
-Use a fine-grained GitHub token owned by the configured organization. Give it access to the repositories you want on the board. Read access to repository metadata, issues, and pull requests is enough. Some organizations require an owner to approve the token. The app makes read-only GitHub API calls and does not pass this token to agent processes.
+Configure at least one organization or repository. You can configure both:
+
+```dotenv
+# Include every accessible repository from these organizations
+GITHUB_ORGS=your-organization,another-organization
+
+# Include these repositories by their full owner/repository names
+GITHUB_REPOS=your-owner/nest-starter,another-owner/tool
+```
+
+Give the fine-grained GitHub token access to every configured organization and repository. Read access to repository metadata, issues, and pull requests is enough. Some organizations require an owner to approve the token. The app makes read-only GitHub API calls and does not pass this token to agent processes.
 
 Useful optional settings:
 
 ```dotenv
-# Comma-separated owner/repository names outside GITHUB_ORG
-GITHUB_REPOS=another-owner/tool
-
 # Comma-separated owner/repository names to hide
 GITHUB_EXCLUDE_REPOS=your-organization/archived-tool
 
-# Comma-separated team slugs. Empty means all your teams in the organization.
+# Comma-separated team slugs. Empty means all your teams in the configured organizations and repository owners.
 GITHUB_TEAM_ALLOWLIST=platform,backend
 
 # Comma-separated folders searched for existing clones

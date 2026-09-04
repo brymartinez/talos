@@ -23,5 +23,10 @@ export type BoardData = Readonly<{
     startedAt: string; finishedAt: string | null;
     errors: readonly Readonly<{ scope: string; code: string; message: string }>[];
   }>;
-  config: Readonly<{ organization: string; repositories: readonly string[]; workAgent: string; concurrency: number }>;
+  config: Readonly<{
+    organizations: readonly string[];
+    repositories: readonly string[];
+    workAgent: string;
+    concurrency: number;
+  }>;
 }>;

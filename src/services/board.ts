@@ -93,6 +93,11 @@ export function boardSnapshot(database: Database, config: AppConfig): unknown {
     columns: ["backlog", "planning", "building", "review", "done"], cards,
     syncPending,
     refresh: refresh ? { id: refresh.id, status: refresh.status, repositoryCount: refresh.repository_count, sourceItemCount: refresh.source_item_count, startedAt: refresh.started_at, finishedAt: refresh.finished_at, errors } : null,
-    config: { organization: config.githubOrganization, repositories: config.extraRepositories, workAgent: config.workAgent, concurrency: config.agentConcurrency },
+    config: {
+      organizations: config.githubOrganizations,
+      repositories: config.githubRepositories,
+      workAgent: config.workAgent,
+      concurrency: config.agentConcurrency,
+    },
   };
 }

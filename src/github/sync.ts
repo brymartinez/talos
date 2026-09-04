@@ -132,17 +132,24 @@ async function readRepositories(
   config: AppConfig,
   onError: (error: Readonly<{ scope: string; code: string; message: string }>) => void,
 ): Promise<readonly RepositoryResponse[]> {
-  const organizationRepositories = await client.restPages({
-    path: `/orgs/${encodeURIComponent(config.githubOrganization)}/repos?type=all`,
-    itemSchema: repositorySchema,
-    scope: `organization:${config.githubOrganization}`,
-  });
-  const byName = new Map(
-    organizationRepositories
-      .filter((repository) => !repository.archived)
-      .map((repository) => [repository.full_name.toLowerCase(), repository]),
-  );
-  for (const repositoryName of config.extraRepositories) {
+  const byName = new Map<string, RepositoryResponse>();
+  for (const organization of config.githubOrganizations) {
+    try {
+      const repositories = await client.restPages({
+        path: `/orgs/${encodeURIComponent(organization)}/repos?type=all`,
+        itemSchema: repositorySchema,
+        scope: `organization:${organization}`,
+      });
+      for (const repository of repositories) {
+        if (!repository.archived) {
+          byName.set(repository.full_name.toLowerCase(), repository);
+        }
+      }
+    } catch (error) {
+      onError(refreshError(error, `organization:${organization}`));
+    }
+  }
+  for (const repositoryName of config.githubRepositories) {
     if (!byName.has(repositoryName)) {
       try {
         const repository = await client.rest({
@@ -164,17 +171,24 @@ async function readRepositories(
   return [...byName.values()];
 }
 
-async function readTeams(client: GitHubClient, config: AppConfig): Promise<readonly string[]> {
+async function readTeams(
+  client: GitHubClient,
+  config: AppConfig,
+): Promise<readonly Readonly<{ organization: string; slug: string }>[]> {
   const teams = await client.restPages({
     path: "/user/teams",
     itemSchema: teamSchema,
     scope: "teams",
   });
   const allowlist = new Set(config.teamAllowlist.map((team) => team.toLowerCase()));
+  const owners = new Set([
+    ...config.githubOrganizations,
+    ...config.githubRepositories.map((repository) => repository.split("/")[0] ?? ""),
+  ]);
   return teams
-    .filter((team) => team.organization.login.toLowerCase() === config.githubOrganization.toLowerCase())
-    .map((team) => team.slug)
-    .filter((team) => allowlist.size === 0 || allowlist.has(team.toLowerCase()));
+    .map((team) => ({ organization: team.organization.login.toLowerCase(), slug: team.slug }))
+    .filter((team) => owners.has(team.organization))
+    .filter((team) => allowlist.size === 0 || allowlist.has(team.slug.toLowerCase()));
 }
 
 export async function syncGitHub(input: Readonly<{
@@ -190,7 +204,7 @@ export async function syncGitHub(input: Readonly<{
     const repositories = await readRepositories(client, input.config, (error) => errors.push(error));
     const allowedNames = new Set(repositories.map((repository) => repository.full_name.toLowerCase()));
     const failedReasons = new Set<MatchReason>();
-    let teams: readonly string[] = [];
+    let teams: readonly Readonly<{ organization: string; slug: string }>[] = [];
     try {
       teams = await readTeams(client, input.config);
     } catch (error) {
@@ -199,8 +213,8 @@ export async function syncGitHub(input: Readonly<{
     }
     const queries = buildSourceQueries({
       username: user.login,
-      organization: input.config.githubOrganization,
-      extraRepositories: input.config.extraRepositories,
+      organizations: input.config.githubOrganizations,
+      repositories: input.config.githubRepositories,
       teams,
       mentionLookbackDays: input.config.mentionLookbackDays,
     });

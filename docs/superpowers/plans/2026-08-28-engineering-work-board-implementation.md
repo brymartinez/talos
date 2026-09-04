@@ -229,7 +229,7 @@ Read the authenticated username, organization repositories, optional extra repos
 
 - [x] **Step 3: Build exact source queries**
 
-Query assigned issues, assigned PRs, authored PRs, direct review requests, and team review requests. Query actual mentions within the configured date window. Do not use `involves` for mentions.
+Query assigned or authored issues, assigned PRs, authored PRs, direct review requests, and team review requests. Query actual mentions within the configured date window. Do not use `involves` for mentions.
 
 - [x] **Step 4: Normalize and deduplicate source items**
 

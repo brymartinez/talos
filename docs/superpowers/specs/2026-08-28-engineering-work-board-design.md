@@ -59,10 +59,10 @@ Read and validate configuration at startup. Show one page that lists every inval
 | Variable | Required | Meaning |
 |---|---:|---|
 | `GITHUB_TOKEN` | Yes | Personal access token used only by the dashboard worker. |
-| `GITHUB_ORG` | Yes | The one organization included in this app run. |
-| `GITHUB_REPOS` | No | Comma-separated extra `owner/repository` names. These may sit outside `GITHUB_ORG`. |
+| `GITHUB_ORGS` | No | Comma-separated organizations. The app includes every accessible repository from each organization. |
+| `GITHUB_REPOS` | No | Comma-separated `owner/repository` names. |
 | `GITHUB_EXCLUDE_REPOS` | No | Comma-separated repositories removed from the final scope. |
-| `GITHUB_TEAM_ALLOWLIST` | No | Comma-separated team slugs. Omit it to use all discovered teams in `GITHUB_ORG`. |
+| `GITHUB_TEAM_ALLOWLIST` | No | Comma-separated team slugs. Omit it to use all discovered teams in the configured sources. |
 | `GITHUB_MENTION_LOOKBACK_DAYS` | No | Mention window. Default: `90`. |
 | `REPO_ROOTS` | No | Comma-separated folders scanned for local clones. Default: `~/Documents/projects`. |
 | `APP_DATA_DIR` | No | SQLite, managed clones, worktrees, and logs. Default: `~/.eng-work-board`. |
@@ -70,7 +70,7 @@ Read and validate configuration at startup. Show one page that lists every inval
 | `AGENT_CONCURRENCY` | No | Maximum active agent runs. Default: `1`. |
 | `CODE_COMMAND` | No | VS Code command. Default: `code`. |
 
-The app reuses existing Codex and Claude Code command-line sign-ins. The app does not store their API keys.
+Set `GITHUB_ORGS`, `GITHUB_REPOS`, or both. The app reuses existing Codex and Claude Code command-line sign-ins. The app does not store their API keys.
 
 ## Domain records
 
@@ -98,10 +98,10 @@ The user starts every refresh with **Sync GitHub**. Do not poll GitHub in the ba
 A refresh performs these steps:
 
 1. Read the authenticated GitHub username from the token.
-2. List accessible repositories in `GITHUB_ORG`.
+2. List accessible repositories in every organization in `GITHUB_ORGS`.
 3. Add `GITHUB_REPOS` and remove `GITHUB_EXCLUDE_REPOS`.
-4. Discover the user's teams in `GITHUB_ORG`, then apply `GITHUB_TEAM_ALLOWLIST` when present.
-5. Query open assigned issues, assigned pull requests, authored pull requests, direct review requests, team review requests, and mentions.
+4. Discover the user's teams in the configured organizations and repository owners, then apply `GITHUB_TEAM_ALLOWLIST` when present.
+5. Query open assigned or authored issues, assigned pull requests, authored pull requests, direct review requests, team review requests, and mentions.
 6. Normalize and deduplicate results by repository and GitHub number.
 7. Save source items, match reasons, and card changes in one database transaction.
 
