@@ -1,9 +1,7 @@
-import { resolve } from "node:path";
-
 import type { Database } from "@/src/db/sqlite";
 
 import type { CardId } from "@/src/domain/types";
-import { deleteCardWorkspace, worktreeRoot } from "@/src/git/workspace";
+import { deleteCardWorkspace, isCardWorktreePath } from "@/src/git/workspace";
 
 type WorkspaceRow = Readonly<{ repository_path: string; worktree_path: string; branch_name: string | null }>;
 
@@ -16,8 +14,7 @@ export async function handleDeleteWorktree(
     "SELECT repository_path, worktree_path, branch_name FROM workspaces WHERE card_id = ?",
   ).get(cardId);
   if (!row) return;
-  const root = `${resolve(worktreeRoot(row.repository_path))}/`;
-  if (!resolve(row.worktree_path).startsWith(root)) {
+  if (!isCardWorktreePath(row.repository_path, row.worktree_path)) {
     throw new Error("Saved workspace is outside the card worktree directory");
   }
   await deleteCardWorkspace({

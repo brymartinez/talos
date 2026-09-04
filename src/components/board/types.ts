@@ -1,4 +1,5 @@
 import type { AgentResult } from "@/src/agents/types";
+import type { ChangeType } from "@/src/domain/types";
 
 export type Stage = "backlog" | "planning" | "building" | "review" | "done";
 export type Run = Readonly<{
@@ -12,6 +13,7 @@ export type WorkCardData = Readonly<{
   itemType: "issue" | "pull_request"; number: number; repository: string;
   labels: readonly string[]; matchReasons: readonly string[]; notes: string;
   notesUpdatedAt: string | null; workAgent: "codex" | "claude";
+  changeType: ChangeType | null;
   noLongerAssigned: boolean; runs: readonly Run[]; worktreePath: string | null;
 }>;
 export type BoardData = Readonly<{

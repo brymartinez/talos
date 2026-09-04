@@ -16,13 +16,16 @@ export function migrateDatabase(database: Database): void {
     if (!version) {
       throw new Error("SQLite did not return PRAGMA user_version");
     }
-    if (version.user_version > 3) {
+    if (version.user_version > 4) {
       throw new Error(`Database version ${version.user_version} is newer than this app supports`);
     }
-    if (version.user_version === 0) {
+    let currentVersion = version.user_version;
+    if (currentVersion === 0) {
       const schema = readFileSync(join(process.cwd(), "src/db/schema.sql"), "utf8");
       database.exec(schema);
-    } else if (version.user_version === 1) {
+      currentVersion = 4;
+    }
+    if (currentVersion === 1) {
       database.exec(`
         UPDATE agent_runs
         SET status = 'interrupted',
@@ -45,7 +48,9 @@ export function migrateDatabase(database: Database): void {
           WHERE status IN ('queued', 'running');
         PRAGMA user_version = 2;
       `);
-    } else if (version.user_version === 2) {
+      currentVersion = 2;
+    }
+    if (currentVersion === 2) {
       database.exec(`
         CREATE TABLE agent_runs_new (
           id TEXT PRIMARY KEY,
@@ -74,6 +79,15 @@ export function migrateDatabase(database: Database): void {
           WHERE status IN ('queued', 'running');
         PRAGMA user_version = 3;
       `);
+      currentVersion = 3;
+    }
+    if (currentVersion === 3) {
+      database.exec(`
+        ALTER TABLE cards ADD COLUMN change_type TEXT
+          CHECK (change_type IN ('feat', 'fix', 'refactor', 'perf', 'docs', 'test', 'build', 'ci', 'chore'));
+        PRAGMA user_version = 4;
+      `);
+      currentVersion = 4;
     }
     database.exec("COMMIT");
   } catch (error) {

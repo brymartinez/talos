@@ -56,7 +56,7 @@ export function loadAgentContext(input: Readonly<{
 // does not re-derive status from "questions" length or parse "verdict" text. Get it
 // wrong and the card lands in the wrong column state.
 const RESULT_FORMAT = `End with exactly one line beginning ENGINEERING_WORK_BOARD_RESULT: followed by JSON matching this exact shape (all fields required, use "" or [] when a section does not apply):
-{"outcome": "succeeded" | "needs_input" | "changes_requested", "summary": string, "blockers": string[], "questions": string[], "plan": {"file": string, "change": string}[], "changedFiles": string[], "checks": {"command": string, "result": string}[], "findings": string[], "verdict": string, "prTitle": string, "prDescription": string}
+{"outcome": "succeeded" | "needs_input" | "changes_requested", "summary": string, "changeType": "feat" | "fix" | "refactor" | "perf" | "docs" | "test" | "build" | "ci" | "chore" | null, "blockers": string[], "questions": string[], "plan": {"file": string, "change": string}[], "changedFiles": string[], "checks": {"command": string, "result": string}[], "findings": string[], "verdict": string, "prTitle": string, "prDescription": string}
 Set "outcome" to exactly one of:
 - "needs_input" — "questions" is non-empty and you need an answer before you can continue.
 - "changes_requested" — this is a review and the changes are not ready to ship yet.
@@ -73,7 +73,7 @@ export function stagePrompt(input: Readonly<{
   githubNumber: number;
 }>): string {
   const task = {
-    planning: "Triage the work. Find blockers. Return a file-level plan and checks. Do not edit files.",
+    planning: "Triage the work. Find blockers. Return a file-level plan and checks. Suggest the Conventional Commit type in changeType when implementation work is needed. Do not edit files.",
     building: "Implement the approved plan. Run useful checks. Do not commit, push, tag, or create a PR.",
     review: "Review the uncommitted changes. Do not edit files. Give concrete findings and a verdict.",
   }[input.stage];

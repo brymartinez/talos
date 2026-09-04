@@ -5,6 +5,19 @@ import { useEffect, useState } from "react";
 
 import type { WorkCardData } from "@/src/components/board/types";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
+import { changeTypeSchema, changeTypes, type ChangeType } from "@/src/domain/types";
+
+const changeTypeLabels: Readonly<Record<ChangeType, string>> = {
+  feat: "Feature",
+  fix: "Bug fix",
+  refactor: "Refactor",
+  perf: "Performance",
+  docs: "Documentation",
+  test: "Tests",
+  build: "Build",
+  ci: "CI",
+  chore: "Chore",
+};
 
 async function action(url: string, method = "POST", body?: unknown): Promise<void> {
   const response = await fetch(url, { method, headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
@@ -14,6 +27,7 @@ async function action(url: string, method = "POST", body?: unknown): Promise<voi
 export function CardDrawer({ card, onClose, onChanged }: Readonly<{ card: WorkCardData; onClose: () => void; onChanged: () => void }>) {
   const [notes, setNotes] = useState(card.notes);
   const [agent, setAgent] = useState(card.workAgent);
+  const [changeType, setChangeType] = useState<ChangeType | "">(card.changeType ?? "");
   const [message, setMessage] = useState("");
   const [notesSaved, setNotesSaved] = useState(false);
   const [commandCopied, setCommandCopied] = useState(false);
@@ -22,6 +36,7 @@ export function CardDrawer({ card, onClose, onChanged }: Readonly<{ card: WorkCa
   const canChangeAgent = card.stage === "backlog" || (
     card.stage === "planning" && ["failed", "interrupted", "cancelled"].includes(latest?.status ?? "")
   );
+  const canChangeType = card.stage === "backlog" || card.stage === "planning";
   const draft = card.runs.find((run) => run.stage === "building" && run.status === "succeeded" && (run.result?.prTitle || run.result?.prDescription))?.result;
   useEffect(() => { document.getElementById("drawer-close")?.focus(); }, []);
   const run = async (operation: () => Promise<void>): Promise<void> => {
@@ -53,11 +68,17 @@ export function CardDrawer({ card, onClose, onChanged }: Readonly<{ card: WorkCa
           const value = event.currentTarget.value;
           if (value === "codex" || value === "claude") setAgent(value);
         }}><option value="codex">Codex</option><option value="claude">Claude Code</option></select></label>
+        <label className="field"><span>Change type</span><select value={changeType} disabled={!canChangeType} onChange={(event) => {
+          const parsed = changeTypeSchema.safeParse(event.currentTarget.value);
+          setChangeType(parsed.success ? parsed.data : "");
+        }}><option value="">Select a change type</option>{changeTypes.map((type) => (
+          <option key={type} value={type}>{changeTypeLabels[type]} ({type})</option>
+        ))}</select></label>
         <button className="primary-button" type="button" onClick={() => run(async () => {
-          await action(`/api/cards/${card.id}`, "PATCH", { notes, workAgent: agent });
+          await action(`/api/cards/${card.id}`, "PATCH", { notes, workAgent: agent, changeType: changeType || null });
           setNotesSaved(true);
           setTimeout(() => setNotesSaved(false), 2_000);
-        })}>Save notes</button>
+        })}>Save details</button>
         {notesSaved ? <p className="notes-saved" role="status">Saved</p> : null}
         {latest ? <section className="run-panel">
           <div className="run-heading"><h3>Latest {latest.stage}</h3><StatusBadge status={latest.status} /></div>

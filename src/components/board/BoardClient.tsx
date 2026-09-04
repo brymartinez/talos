@@ -92,7 +92,7 @@ export function BoardClient() {
         </section>
         <DragOverlay>{activeCard ? <WorkCardPreview card={activeCard} /> : null}</DragOverlay>
       </DndContext>
-      {selected ? <CardDrawer card={selected} onClose={() => setSelectedId(null)} onChanged={() => void refresh()} /> : null}
+      {selected ? <CardDrawer key={`${selected.id}:${selected.changeType ?? ""}`} card={selected} onClose={() => setSelectedId(null)} onChanged={() => void refresh()} /> : null}
     </>
   );
 }

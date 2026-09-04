@@ -51,6 +51,7 @@ CREATE TABLE cards (
   notes TEXT NOT NULL DEFAULT '',
   notes_updated_at TEXT,
   work_agent TEXT NOT NULL CHECK (work_agent IN ('codex', 'claude')),
+  change_type TEXT CHECK (change_type IN ('feat', 'fix', 'refactor', 'perf', 'docs', 'test', 'build', 'ci', 'chore')),
   archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1)),
   no_longer_assigned INTEGER NOT NULL DEFAULT 0 CHECK (no_longer_assigned IN (0, 1)),
   created_at TEXT NOT NULL,
@@ -155,4 +156,4 @@ CREATE TABLE refresh_errors (
   created_at TEXT NOT NULL
 );
 
-PRAGMA user_version = 3;
+PRAGMA user_version = 4;

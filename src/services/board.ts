@@ -2,11 +2,12 @@ import type { Database } from "@/src/db/sqlite";
 
 import { agentResultSchema } from "@/src/agents/types";
 import type { AppConfig } from "@/src/config/env";
-import { matchReasonSchema, runStateSchema, stageSchema } from "@/src/domain/types";
+import { changeTypeSchema, matchReasonSchema, runStateSchema, stageSchema, type ChangeType } from "@/src/domain/types";
 
 type CardRow = Readonly<{
   id: string; source_id: string; stage: string; position: number; notes: string; notes_updated_at: string | null;
   work_agent: "codex" | "claude"; archived: number; no_longer_assigned: number;
+  change_type: ChangeType | null;
   title: string; body: string; html_url: string; item_type: "issue" | "pull_request";
   github_number: number; repository_name: string; labels_json: string; worktree_path: string | null;
 }>;
@@ -25,7 +26,7 @@ type RefreshRow = Readonly<{
 export function boardSnapshot(database: Database, config: AppConfig): unknown {
   const rows = database.query<CardRow, []>(
     `SELECT cards.id, source_items.id AS source_id, cards.stage, cards.position, cards.notes, cards.notes_updated_at,
-      cards.work_agent, cards.archived, cards.no_longer_assigned,
+      cards.work_agent, cards.change_type, cards.archived, cards.no_longer_assigned,
       source_items.title, source_items.body, source_items.html_url, source_items.item_type,
       source_items.github_number, repositories.full_name AS repository_name, source_items.labels_json,
       workspaces.worktree_path
@@ -77,6 +78,7 @@ export function boardSnapshot(database: Database, config: AppConfig): unknown {
     number: row.github_number, repository: row.repository_name,
     labels: JSON.parse(row.labels_json), matchReasons: reasonBySource.get(row.source_id) ?? [],
     notes: row.notes, notesUpdatedAt: row.notes_updated_at, workAgent: row.work_agent,
+    changeType: changeTypeSchema.nullable().parse(row.change_type),
     noLongerAssigned: row.no_longer_assigned === 1, runs: runsByCard.get(row.id) ?? [],
     worktreePath: row.worktree_path,
   }));

@@ -2,20 +2,21 @@ import type { Database } from "@/src/db/sqlite";
 import { z } from "zod";
 
 import { insertQueueJob, moveCardAtomically } from "@/src/db/repositories";
-import { agentProviderSchema, cardIdSchema, newRunId, stageSchema, type Card, type CardId, type MatchReason, type RunState } from "@/src/domain/types";
+import { agentProviderSchema, cardIdSchema, changeTypeSchema, newRunId, stageSchema, type Card, type CardId, type ChangeType, type MatchReason, type RunState } from "@/src/domain/types";
 import { canMoveCard, isForwardMove } from "@/src/domain/workflow";
 import { ServiceError } from "@/src/services/runtime";
 
 type CardRow = Readonly<{
   id: string; item_type: "issue" | "pull_request"; stage: string; position: number;
   notes: string; notes_updated_at: string | null; work_agent: "codex" | "claude";
+  change_type: ChangeType | null;
   archived: number; no_longer_assigned: number; active_run_state: RunState | null;
 }>;
 
 function loadCard(database: Database, cardId: CardId): Card {
   const row = database.query<CardRow, [CardId]>(
     `SELECT cards.id, source_items.item_type, cards.stage, cards.position, cards.notes,
-      cards.notes_updated_at, cards.work_agent, cards.archived, cards.no_longer_assigned,
+      cards.notes_updated_at, cards.work_agent, cards.change_type, cards.archived, cards.no_longer_assigned,
       (SELECT status FROM agent_runs WHERE card_id = cards.id ORDER BY created_at DESC LIMIT 1) AS active_run_state
      FROM cards JOIN source_items ON source_items.id = cards.source_item_id WHERE cards.id = ?`,
   ).get(cardId);
@@ -28,6 +29,7 @@ function loadCard(database: Database, cardId: CardId): Card {
     id: cardIdSchema.parse(row.id), itemType: row.item_type, matchReasons: reasons,
     stage: stageSchema.parse(row.stage), position: row.position, notes: row.notes,
     notesUpdatedAt: row.notes_updated_at, workAgent: row.work_agent,
+    changeType: changeTypeSchema.nullable().parse(row.change_type),
     archived: row.archived === 1, noLongerAssigned: row.no_longer_assigned === 1,
     activeRunState: row.active_run_state,
   };
@@ -42,7 +44,11 @@ export function queueSync(database: Database): string {
 
 export function updateCard(database: Database, rawCardId: string, input: unknown): void {
   const cardId = cardIdSchema.parse(rawCardId);
-  const values = z.object({ notes: z.string().max(20_000).optional(), workAgent: agentProviderSchema.optional() }).parse(input);
+  const values = z.object({
+    notes: z.string().max(20_000).optional(),
+    workAgent: agentProviderSchema.optional(),
+    changeType: changeTypeSchema.nullable().optional(),
+  }).parse(input);
   const card = loadCard(database, cardId);
   const planningCanRestart =
     card.stage === "planning" &&
@@ -55,10 +61,33 @@ export function updateCard(database: Database, rawCardId: string, input: unknown
   ) {
     throw new ServiceError("agent_locked", "The work agent can only change before Planning starts.", 409);
   }
+  if (values.changeType !== undefined && card.stage !== "backlog" && card.stage !== "planning") {
+    throw new ServiceError("change_type_locked", "The change type cannot change after Building starts.", 409);
+  }
   const timestamp = new Date().toISOString();
-  database.query<unknown, [string, string | null, "codex" | "claude", string, CardId]>(
-    `UPDATE cards SET notes = ?, notes_updated_at = ?, work_agent = ?, updated_at = ? WHERE id = ?`,
-  ).run(values.notes ?? card.notes, values.notes !== undefined ? timestamp : card.notesUpdatedAt, values.workAgent ?? card.workAgent, timestamp, cardId);
+  database.query<unknown, [string, string | null, "codex" | "claude", ChangeType | null, string, CardId]>(
+    `UPDATE cards SET notes = ?, notes_updated_at = ?, work_agent = ?, change_type = ?, updated_at = ? WHERE id = ?`,
+  ).run(
+    values.notes ?? card.notes,
+    values.notes !== undefined ? timestamp : card.notesUpdatedAt,
+    values.workAgent ?? card.workAgent,
+    values.changeType === undefined ? card.changeType : values.changeType,
+    timestamp,
+    cardId,
+  );
+}
+
+export function saveSuggestedChangeType(
+  database: Database,
+  cardId: CardId,
+  changeType: ChangeType | null,
+): void {
+  if (!changeType) return;
+  database.query<unknown, [ChangeType, string, CardId]>(
+    `UPDATE cards
+     SET change_type = COALESCE(change_type, ?), updated_at = ?
+     WHERE id = ? AND stage = 'planning'`,
+  ).run(changeType, new Date().toISOString(), cardId);
 }
 
 export function moveCard(database: Database, rawCardId: string, input: unknown): void {
@@ -66,6 +95,9 @@ export function moveCard(database: Database, rawCardId: string, input: unknown):
   const destination = z.object({ destination: stageSchema }).parse(input).destination;
   const card = loadCard(database, cardId);
   if (!canMoveCard(card, destination)) throw new ServiceError("invalid_move", "That stage move is not allowed.", 409);
+  if (destination === "building" && !card.changeType) {
+    throw new ServiceError("change_type_required", "Select a change type before Building.", 409);
+  }
   const forward = isForwardMove(card, destination);
   const runId = forward ? newRunId() : undefined;
   database.transaction(() => {

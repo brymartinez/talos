@@ -3,7 +3,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { loadAgentContext } from "@/src/agents/prompts";
+import { agentResultSchema } from "@/src/agents/types";
+import { loadAgentContext, stagePrompt } from "@/src/agents/prompts";
 
 const originalWorkingDirectory = process.cwd();
 const temporaryDirectories: string[] = [];
@@ -33,6 +34,25 @@ afterEach(() => {
 });
 
 describe("stagePrompt agent instructions", () => {
+  test("asks Planning to suggest a Conventional Commit type", () => {
+    const prompt = stagePrompt({
+      stage: "planning",
+      title: "Correct an error",
+      body: "",
+      notes: "",
+      itemType: "issue",
+      githubNumber: 42,
+    });
+    const result = agentResultSchema.parse({
+      outcome: "succeeded",
+      summary: "Use fix",
+      changeType: "fix",
+    });
+
+    expect(prompt).toContain("changeType");
+    expect(result.changeType).toBe("fix");
+  });
+
   test("reads eng-work-board AGENTS.md outside the app working directory", () => {
     process.chdir(mkdtempSync(join(tmpdir(), "eng-work-board-cwd-")));
     temporaryDirectories.push(process.cwd());

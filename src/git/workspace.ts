@@ -1,10 +1,10 @@
-import { mkdir, stat } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { appendFile, mkdir, readFile, stat } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import type { Database } from "@/src/db/sqlite";
 
 import type { AppConfig } from "@/src/config/env";
-import type { CardId } from "@/src/domain/types";
+import type { CardId, ChangeType } from "@/src/domain/types";
 import { findLocalRepository, normalizeGitHubRemote } from "@/src/git/repository-locator";
 import { runGit } from "@/src/git/run-git";
 import { captureGitState, type GitState } from "@/src/git/state";
@@ -34,7 +34,15 @@ export type CardWorkspace = Readonly<{
 }>;
 
 export function worktreeRoot(repositoryPath: string): string {
-  return join(repositoryPath, ".worktree");
+  return join(repositoryPath, ".worktrees");
+}
+
+export function isCardWorktreePath(repositoryPath: string, worktreePath: string): boolean {
+  const target = resolve(worktreePath);
+  return [".worktrees"].some((directory) => {
+    const pathFromRoot = relative(resolve(repositoryPath, directory), target);
+    return pathFromRoot !== "" && pathFromRoot !== ".." && !pathFromRoot.startsWith(`..${sep}`) && !isAbsolute(pathFromRoot);
+  });
 }
 
 const repositoryLocks = new Map<string, Promise<void>>();
@@ -64,9 +72,49 @@ function worktreeName(source: WorkspaceSource): string {
   return `${source.githubNumber}-${slug(source.title)}`;
 }
 
-function reviewOnly(source: WorkspaceSource): boolean {
-  const reasons = new Set(source.matchReasons);
-  return source.itemType === "pull_request" && !reasons.has("assigned") && !reasons.has("authored");
+async function ensureWorktreeRootIgnored(repositoryPath: string): Promise<void> {
+  const gitPath = (await runGit({
+    args: ["rev-parse", "--git-path", "info/exclude"],
+    cwd: repositoryPath,
+  })).stdout;
+  const excludePath = isAbsolute(gitPath) ? gitPath : resolve(repositoryPath, gitPath);
+  await mkdir(dirname(excludePath), { recursive: true });
+  let contents = "";
+  try {
+    contents = await readFile(excludePath, "utf8");
+  } catch {
+    contents = "";
+  }
+  if (contents.split("\n").includes("/.worktrees/")) return;
+  const separator = contents.length > 0 && !contents.endsWith("\n") ? "\n" : "";
+  await appendFile(excludePath, `${separator}/.worktrees/\n`);
+}
+
+export async function createCardBranch(input: Readonly<{
+  repositoryPath: string;
+  worktreePath: string;
+  changeType: ChangeType;
+  githubNumber: number;
+  title: string;
+}>): Promise<string> {
+  const branchName = `${input.changeType}/${input.githubNumber}-${slug(input.title)}`;
+  return serialized(input.repositoryPath, async () => {
+    const currentBranch = await runGit({
+      args: ["branch", "--show-current"],
+      cwd: input.worktreePath,
+    });
+    if (currentBranch.stdout === branchName) return branchName;
+    const existingBranch = await runGit({
+      args: ["show-ref", "--verify", `refs/heads/${branchName}`],
+      cwd: input.repositoryPath,
+      allowFailure: true,
+    });
+    await runGit({
+      args: existingBranch.exitCode === 0 ? ["switch", branchName] : ["switch", "-c", branchName],
+      cwd: input.worktreePath,
+    });
+    return branchName;
+  });
 }
 
 export async function resolveRepository(source: WorkspaceSource, config: AppConfig): Promise<string> {
@@ -79,7 +127,7 @@ export async function resolveRepository(source: WorkspaceSource, config: AppConf
       });
       if (topLevel.exitCode === 0) {
         const remote = await runGit({
-          args: ["remote", "get-url", "origin"],
+          args: ["config", "--get", "remote.origin.url"],
           cwd: topLevel.stdout,
           allowFailure: true,
         });
@@ -106,8 +154,9 @@ export async function createCardWorkspace(
 ): Promise<CardWorkspace> {
   const repositoryPath = await resolveRepository(source, config);
   const worktreePath = join(worktreeRoot(repositoryPath), worktreeName(source));
-  await mkdir(worktreeRoot(repositoryPath), { recursive: true });
-  return serialized(source.repositoryName, async () => {
+  return serialized(repositoryPath, async () => {
+    await ensureWorktreeRootIgnored(repositoryPath);
+    await mkdir(worktreeRoot(repositoryPath), { recursive: true });
     let worktreeExists = false;
     try {
       worktreeExists = (await stat(worktreePath)).isDirectory();
@@ -133,7 +182,6 @@ export async function createCardWorkspace(
       };
     }
     await runGit({ args: ["fetch", "--prune", "origin"], cwd: repositoryPath });
-    const detached = reviewOnly(source);
     let target = `origin/${source.defaultBranch}`;
     if (source.itemType === "pull_request" && source.headRef) {
       const localRef = `refs/eng-work-board/pr-${source.githubNumber}`;
@@ -144,17 +192,12 @@ export async function createCardWorkspace(
       target = localRef;
     }
     const baseCommit = (await runGit({ args: ["rev-parse", target], cwd: repositoryPath })).stdout;
-    const branchName = detached
-      ? null
-      : `codex/${slug(source.repositoryName)}-${source.itemType === "issue" ? "issue" : "pr"}-${source.githubNumber}-${slug(source.title)}`;
     await runGit({
-      args: branchName
-        ? ["worktree", "add", "-b", branchName, worktreePath, baseCommit]
-        : ["worktree", "add", "--detach", worktreePath, baseCommit],
+      args: ["worktree", "add", "--detach", worktreePath, baseCommit],
       cwd: repositoryPath,
     });
     const beforeState = await captureGitState(worktreePath);
-    return { repositoryPath, worktreePath, branchName, checkoutMode: detached ? "detached" : "branch", baseCommit, beforeState };
+    return { repositoryPath, worktreePath, branchName: null, checkoutMode: "detached", baseCommit, beforeState };
   });
 }
 

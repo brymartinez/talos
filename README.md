@@ -77,8 +77,8 @@ The web server binds to `127.0.0.1`. It is not exposed to other devices on the l
 
 The normal flow is:
 
-1. Move a card from Backlog to Planning. The selected work agent triages it and writes a plan without editing files.
-2. Review the plan and add notes when needed.
+1. Move a card from Backlog to Planning. The selected work agent triages it, suggests a change type, and writes a plan without editing files.
+2. Review the plan, change the suggested type when needed, and add notes.
 3. Move implementation work to Building. The same agent session edits the isolated worktree and runs checks.
 4. Open the worktree in VS Code and inspect the uncommitted changes.
 5. Move the card to Review. The other agent reviews the diff without editing it.
@@ -93,10 +93,15 @@ By default, app data lives under `~/.eng-work-board`:
 
 - `board.sqlite` stores board state and the durable queue.
 - `repos/` stores app-managed clones.
-- `worktrees/<card-id>/` stores isolated card worktrees.
 - `logs/<run-id>.log` stores full agent output.
 
 Change the root with `APP_DATA_DIR`.
+
+Each card worktree lives in the target repository at
+`.worktrees/<number>-<title-slug>`. Planning uses a detached checkout. Moving the
+card to Building creates `<type>/<number>-<title-slug>` in that worktree. The app
+adds `/.worktrees/` to the repository's local Git exclude file. Branch types
+follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
 The drawer can delete a clean worktree. Dirty worktrees are refused unless an explicit forced deletion is requested. The worker checks the exact saved path before opening VS Code or deleting a worktree.
 
@@ -113,9 +118,10 @@ See [ADR 0001](docs/adr/0001-local-agent-kanban-workflow.md) for the workflow de
 
 ## Validation
 
-This project intentionally has no automated test suite. Run the static checks:
+Run the tests and static checks:
 
 ```bash
+bun test
 bun run lint
 bun run typecheck
 bun run build

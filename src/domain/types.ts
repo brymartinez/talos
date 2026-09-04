@@ -3,6 +3,20 @@ import { z } from "zod";
 export const agentProviderSchema = z.enum(["codex", "claude"]);
 export type AgentProvider = z.infer<typeof agentProviderSchema>;
 
+export const changeTypes = [
+  "feat",
+  "fix",
+  "refactor",
+  "perf",
+  "docs",
+  "test",
+  "build",
+  "ci",
+  "chore",
+] as const;
+export const changeTypeSchema = z.enum(changeTypes);
+export type ChangeType = z.infer<typeof changeTypeSchema>;
+
 export const itemTypeSchema = z.enum(["issue", "pull_request"]);
 export type ItemType = z.infer<typeof itemTypeSchema>;
 
@@ -91,6 +105,7 @@ export type Card = Readonly<{
   notes: string;
   notesUpdatedAt: string | null;
   workAgent: AgentProvider;
+  changeType: ChangeType | null;
   archived: boolean;
   noLongerAssigned: boolean;
   activeRunState: RunState | null;

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { AgentProvider, RunId, Stage } from "@/src/domain/types";
+import { changeTypeSchema, type AgentProvider, type RunId, type Stage } from "@/src/domain/types";
 
 const findingSchema = z.union([z.string(), z.record(z.string(), z.unknown())]).transform((value) => {
   if (typeof value === "string") return value;
@@ -12,6 +12,7 @@ const findingSchema = z.union([z.string(), z.record(z.string(), z.unknown())]).t
 export const agentResultSchema = z.object({
   outcome: z.enum(["succeeded", "needs_input", "changes_requested"]),
   summary: z.string(),
+  changeType: changeTypeSchema.nullable().default(null),
   blockers: z.array(z.string()).default([]),
   questions: z.array(z.string()).default([]),
   plan: z.array(z.object({ file: z.string(), change: z.string() })).default([]),

@@ -10,9 +10,18 @@ import { loadAgentContext, resumeCheckInPrompt, stagePrompt } from "@/src/agents
 import type { AgentResult, AgentRunner } from "@/src/agents/types";
 import type { AppConfig } from "@/src/config/env";
 import { getCardWorkSource, saveRepositoryPath } from "@/src/db/repositories";
-import { agentProviderSchema, cardIdSchema, runIdSchema, stageSchema, type AgentProvider } from "@/src/domain/types";
+import {
+  agentProviderSchema,
+  cardIdSchema,
+  changeTypeSchema,
+  runIdSchema,
+  stageSchema,
+  type AgentProvider,
+  type ChangeType,
+} from "@/src/domain/types";
 import { captureGitState } from "@/src/git/state";
-import { createCardWorkspace, saveWorkspace } from "@/src/git/workspace";
+import { createCardBranch, createCardWorkspace, saveWorkspace } from "@/src/git/workspace";
+import { saveSuggestedChangeType } from "@/src/services/cards";
 
 const payloadSchema = z.object({ stage: stageSchema.exclude(["backlog", "done"]) });
 type RunContext = Readonly<{
@@ -22,6 +31,7 @@ type RunContext = Readonly<{
   work_agent: AgentProvider;
   item_type: "issue" | "pull_request";
   github_number: number;
+  change_type: ChangeType | null;
 }>;
 type WorkspaceRow = Readonly<{
   repository_path: string;
@@ -48,7 +58,7 @@ export async function handleRunStage(input: Readonly<{
   const runId = runIdSchema.parse(input.runId);
   const { stage } = payloadSchema.parse(input.payload);
   const context = input.database.query<RunContext, [typeof cardId]>(
-    `SELECT source_items.title, source_items.body, cards.notes, cards.work_agent,
+    `SELECT source_items.title, source_items.body, cards.notes, cards.work_agent, cards.change_type,
             source_items.item_type, source_items.github_number
      FROM cards JOIN source_items ON source_items.id = cards.source_item_id WHERE cards.id = ?`,
   ).get(cardId);
@@ -99,6 +109,19 @@ export async function handleRunStage(input: Readonly<{
       : null;
   if (stage === "building" && !priorSession) {
     throw new Error("Building requires a successful Planning session from the selected work agent");
+  }
+  if (stage === "building" && !workspace.branch_name) {
+    const branchName = await createCardBranch({
+      repositoryPath: workspace.repository_path,
+      worktreePath: workspace.worktree_path,
+      changeType: changeTypeSchema.parse(context.change_type),
+      githubNumber: context.github_number,
+      title: context.title,
+    });
+    input.database.query<unknown, [string, "branch", string, typeof cardId]>(
+      "UPDATE workspaces SET branch_name = ?, checkout_mode = ?, updated_at = ? WHERE card_id = ?",
+    ).run(branchName, "branch", new Date().toISOString(), cardId);
+    workspace = { ...workspace, branch_name: branchName, checkout_mode: "branch" };
   }
   // priorSession for "building" is always set (it's how Building inherits Planning's
   // session), even on the very first Building attempt — that first attempt still needs
@@ -173,6 +196,9 @@ export async function handleRunStage(input: Readonly<{
   const finished = new Date().toISOString();
   const status = exitCode === 0 && result ? result.outcome : "failed";
   input.database.transaction(() => {
+    if (stage === "planning" && status === "succeeded" && result) {
+      saveSuggestedChangeType(input.database, cardId, result.changeType);
+    }
     input.database.query<
       unknown,
       [string, string | null, string | null, string, string, string, string | null, string, typeof runId]

@@ -8,6 +8,25 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
+## Worktree and branch conventions
+
+Create repository worktrees under `.worktrees/` in the target repository. Name a
+general development worktree after its branch. For example:
+
+```bash
+git worktree add .worktrees/feat/example -b feat/example
+```
+
+Use a [Conventional Commit](https://www.conventionalcommits.org/en/v1.0.0/)
+type at the start of each branch name. Supported types are `feat`, `fix`,
+`refactor`, `perf`, `docs`, `test`, `build`, `ci`, and `chore`.
+Do not use a breaking-change branch type. Mark a breaking change in the commit
+message with `!` or a `BREAKING CHANGE:` footer.
+
+Card runs create `.worktrees/<number>-<title-slug>` as a detached checkout during
+Planning. Before Building starts, the app creates
+`<type>/<number>-<title-slug>` in that worktree.
+
 ## Default skills for card runs
 
 The two sections below are passed to the agent provider as startup context by
