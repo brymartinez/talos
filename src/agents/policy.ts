@@ -48,6 +48,16 @@ export async function prepareAgentPolicy(input: Readonly<{
   sandboxExecutable: string;
   sandboxProfile: string;
 }>> {
+  // macOS tools ignore an injected TMPDIR override in two different ways: bash heredocs
+  // and BSD mktemp's internal fallback hardcode plain /private/tmp, while `mktemp`(1) and
+  // other tools query the OS per-user temp dir via confstr(DARWIN_USER_TEMP_DIR) instead
+  // of getenv("TMPDIR") — a /var/folders/.../T path that's actually a symlink into
+  // /private/var, so the sandbox rule needs the resolved path. Without both allow rules,
+  // e.g. plugin SessionStart hooks that use heredocs fail with EPERM and their content
+  // (including "use skills" reminders) never reaches the agent.
+  const darwinTempDirectory = process.env.TMPDIR
+    ? await realpath(process.env.TMPDIR).catch(() => process.env.TMPDIR)
+    : undefined;
   const runDirectory = join(input.guardDirectory, "runs", input.runId);
   const binDirectory = join(runDirectory, "bin");
   const emptyGitHubConfig = join(runDirectory, "empty-gh");
@@ -100,14 +110,10 @@ esac
     "/usr/bin/ssh",
     "/usr/bin/xcrun",
   ]);
-  // The Claude Code CLI derives its own scratchpad directory from cwd under
-  // /private/tmp/claude-<uid>/... regardless of the TMPDIR we inject above, so the
-  // sandbox must allow writes there directly or every run's mkdir gets EPERM.
   const providerWriteRules = input.provider === "codex"
     ? `(allow file-write* (subpath "${quoteSandboxPath(join(homedir(), ".codex"))}"))`
     : `(allow file-write* (subpath "${quoteSandboxPath(join(homedir(), ".claude"))}"))
-(allow file-write* (literal "${quoteSandboxPath(join(homedir(), ".claude.json"))}"))
-(allow file-write* (subpath "${quoteSandboxPath(join("/private/tmp", `claude-${process.getuid()}`))}"))`;
+(allow file-write* (literal "${quoteSandboxPath(join(homedir(), ".claude.json"))}"))`;
   const worktreeWriteRule = input.stage === "building"
     ? `(allow file-write* (subpath "${quoteSandboxPath(input.cwd)}"))`
     : "";
@@ -124,6 +130,8 @@ esac
 (allow default)
 (deny file-write*)
 (allow file-write* (subpath "${quoteSandboxPath(runDirectory)}"))
+(allow file-write* (subpath "/private/tmp"))
+${darwinTempDirectory ? `(allow file-write* (subpath "${quoteSandboxPath(darwinTempDirectory)}"))` : ""}
 ${providerWriteRules}
 ${worktreeWriteRule}
 (deny file-write* (subpath "${quoteSandboxPath(commonDirectory)}"))

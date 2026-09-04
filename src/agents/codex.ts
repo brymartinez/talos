@@ -39,12 +39,19 @@ export class CodexRunner implements AgentRunner {
     // hatch for exactly that ("environments that are externally sandboxed"); our own
     // profile already enforces the real restrictions (no git commit, worktree-scoped
     // writes), so Codex's internal sandbox would only be redundant here anyway.
+    const additionalContext = `developer_instructions=${JSON.stringify(input.additionalContext)}`;
+    const prompt = [
+      input.skills.map((skill) => `$${skill}`).join("\n"),
+      input.additionalContext,
+      input.prompt,
+    ].filter(Boolean).join("\n\n");
     const providerArgs = sessionId
-      ? ["exec", "resume", "--json", "--dangerously-bypass-approvals-and-sandbox", sessionId, "-"]
-      : ["exec", "--json", "--dangerously-bypass-approvals-and-sandbox", "-C", input.cwd, "-"];
+      ? ["exec", "resume", "--json", "--dangerously-bypass-approvals-and-sandbox", "-c", additionalContext, sessionId, "-"]
+      : ["exec", "--json", "--dangerously-bypass-approvals-and-sandbox", "-c", additionalContext, "-C", input.cwd, "-"];
     const args = ["-f", policy.sandboxProfile, command, ...providerArgs];
     yield* streamAgentProcess({
       ...input,
+      prompt,
       command: policy.sandboxExecutable,
       args,
       environment: policy.environment,

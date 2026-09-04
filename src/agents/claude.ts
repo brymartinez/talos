@@ -28,11 +28,44 @@ export class ClaudeRunner implements AgentRunner {
   resume(input: ResumeRunInput): AsyncIterable<AgentEvent> { return this.#run(input, input.sessionId); }
   cancel(runId: string): Promise<void> { return cancelAgentProcess(runId); }
   async *#run(input: StartRunInput, sessionId?: string): AsyncIterable<AgentEvent> {
+    let activeSessionId = sessionId;
+    for (const skill of input.skills.slice(0, -1)) {
+      let exitCode: number | undefined;
+      for await (const event of this.#runOnce({ ...input, prompt: `/${skill}` }, activeSessionId)) {
+        if (event.kind === "session") {
+          activeSessionId = event.sessionId;
+          yield event;
+        } else if (event.kind === "completed") {
+          exitCode = event.exitCode;
+        } else if (event.kind === "error") {
+          yield event;
+        }
+      }
+      if (exitCode !== 0) throw new Error(`Claude failed to load the ${skill} skill`);
+      if (!activeSessionId) throw new Error(`Claude loaded the ${skill} skill without returning a session ID`);
+    }
+    const finalPrompt = [
+      input.skills.at(-1) ? `/${input.skills.at(-1)}` : "",
+      input.additionalContext,
+      input.prompt,
+    ].filter(Boolean).join("\n\n");
+    yield* this.#runOnce({ ...input, prompt: finalPrompt }, activeSessionId);
+  }
+  async *#runOnce(input: StartRunInput, sessionId?: string): AsyncIterable<AgentEvent> {
     const policy = await prepareAgentPolicy({ ...input, provider: this.provider });
     const command = Bun.which("claude");
     if (!command) throw new Error("Claude Code CLI is not installed");
     const permissionMode = input.stage === "building" ? "acceptEdits" : "plan";
-    const providerArgs = ["--print", "--output-format", "stream-json", "--verbose", "--permission-mode", permissionMode];
+    const providerArgs = [
+      "--print",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--append-system-prompt",
+      input.additionalContext,
+      "--permission-mode",
+      permissionMode,
+    ];
     if (sessionId) providerArgs.push("--resume", sessionId);
     const args = ["-f", policy.sandboxProfile, command, ...providerArgs];
     yield* streamAgentProcess({

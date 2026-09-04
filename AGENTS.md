@@ -10,19 +10,22 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Default skills for card runs
 
-The two sections below are injected verbatim into every card's agent prompt by
-`src/agents/prompts.ts` — `agent-defaults-all` into every stage, `agent-defaults-planning` into
-Planning only — regardless of which repository the card targets. Edit the text inside the
-markers to change what a run is told to do; it's read fresh each run, no restart needed. Keep
-that text to just the directives themselves (no commentary) since every token here is spent on
-every run.
+The two sections below are passed to the agent provider as startup context by
+`src/agents/prompts.ts`. `agent-defaults-all` goes into every stage.
+`agent-defaults-planning` goes into Planning only. This applies regardless of
+which repository the card targets. Edit the text inside the markers to change
+what a run is told to do. The app reads it fresh for each run, so no restart is
+needed. Keep the sections to the directives themselves because every token is
+spent on every run. Put each required skill on its own `/skill-name` line. The
+runner loads those skills before it sends the task.
 
 <!-- BEGIN:agent-defaults-all -->
-Use the pstack:unslop skill by default.
+/pstack:unslop
 
 Read and follow `~/.agents/skills/AGENTS.md` by default, to minimize token use.
 <!-- END:agent-defaults-all -->
 
 <!-- BEGIN:agent-defaults-planning -->
-Use the superpowers:brainstorming and mattpocock-skills:grill-with-docs skills by default.
+/superpowers:brainstorming
+/mattpocock-skills:grill-with-docs
 <!-- END:agent-defaults-planning -->

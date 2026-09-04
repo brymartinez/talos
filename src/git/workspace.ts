@@ -161,6 +161,7 @@ export async function createCardWorkspace(
 export async function deleteCardWorkspace(input: Readonly<{
   repositoryPath: string;
   worktreePath: string;
+  branchName: string | null;
   force: boolean;
 }>): Promise<void> {
   const status = await runGit({ args: ["status", "--porcelain=v1"], cwd: input.worktreePath });
@@ -171,6 +172,12 @@ export async function deleteCardWorkspace(input: Readonly<{
     args: ["worktree", "remove", ...(input.force ? ["--force"] : []), input.worktreePath],
     cwd: input.repositoryPath,
   });
+  // The worktree owned the only checkout of this branch; removing the worktree without
+  // deleting the branch leaves it behind, so a later retry's "create the same branch"
+  // step in createCardWorkspace fails with "a branch named ... already exists".
+  if (input.branchName) {
+    await runGit({ args: ["branch", "-D", input.branchName], cwd: input.repositoryPath, allowFailure: true });
+  }
 }
 
 export function saveWorkspace(database: Database, cardId: CardId, workspace: CardWorkspace): void {

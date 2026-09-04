@@ -38,6 +38,8 @@ export type StartRunInput = Readonly<{
   stage: Exclude<Stage, "backlog" | "done">;
   cwd: string;
   prompt: string;
+  additionalContext: string;
+  skills: readonly string[];
   logPath: string;
   guardDirectory: string;
 }>;

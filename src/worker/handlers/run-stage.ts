@@ -6,7 +6,7 @@ import { z } from "zod";
 import { ClaudeRunner } from "@/src/agents/claude";
 import { CodexRunner } from "@/src/agents/codex";
 import { enforceStagePolicy } from "@/src/agents/policy";
-import { resumeCheckInPrompt, stagePrompt } from "@/src/agents/prompts";
+import { loadAgentContext, resumeCheckInPrompt, stagePrompt } from "@/src/agents/prompts";
 import type { AgentResult, AgentRunner } from "@/src/agents/types";
 import type { AppConfig } from "@/src/config/env";
 import { getCardWorkSource, saveRepositoryPath } from "@/src/db/repositories";
@@ -53,6 +53,7 @@ export async function handleRunStage(input: Readonly<{
      FROM cards JOIN source_items ON source_items.id = cards.source_item_id WHERE cards.id = ?`,
   ).get(cardId);
   if (!context) throw new Error("Card does not exist");
+  const agentContext = loadAgentContext({ stage });
   const source = getCardWorkSource(input.database, cardId);
   let workspace = input.database.query<WorkspaceRow, [typeof cardId]>(
     "SELECT repository_path, worktree_path, branch_name, base_commit, checkout_mode, before_state_json FROM workspaces WHERE card_id = ?",
@@ -146,6 +147,8 @@ export async function handleRunStage(input: Readonly<{
     stage,
     cwd: workspace.worktree_path,
     prompt,
+    additionalContext: agentContext.additionalContext,
+    skills: agentContext.skills,
     logPath: join(input.config.paths.logsDirectory, `${runId}.log`),
     guardDirectory: join(input.config.paths.dataDirectory, "guard-bin"),
   };

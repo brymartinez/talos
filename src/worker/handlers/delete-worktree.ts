@@ -5,7 +5,7 @@ import type { Database } from "@/src/db/sqlite";
 import type { CardId } from "@/src/domain/types";
 import { deleteCardWorkspace, worktreeRoot } from "@/src/git/workspace";
 
-type WorkspaceRow = Readonly<{ repository_path: string; worktree_path: string }>;
+type WorkspaceRow = Readonly<{ repository_path: string; worktree_path: string; branch_name: string | null }>;
 
 export async function handleDeleteWorktree(
   database: Database,
@@ -13,7 +13,7 @@ export async function handleDeleteWorktree(
   force: boolean,
 ): Promise<void> {
   const row = database.query<WorkspaceRow, [CardId]>(
-    "SELECT repository_path, worktree_path FROM workspaces WHERE card_id = ?",
+    "SELECT repository_path, worktree_path, branch_name FROM workspaces WHERE card_id = ?",
   ).get(cardId);
   if (!row) return;
   const root = `${resolve(worktreeRoot(row.repository_path))}/`;
@@ -23,6 +23,7 @@ export async function handleDeleteWorktree(
   await deleteCardWorkspace({
     repositoryPath: row.repository_path,
     worktreePath: row.worktree_path,
+    branchName: row.branch_name,
     force,
   });
   database.query<unknown, [CardId]>("DELETE FROM workspaces WHERE card_id = ?").run(cardId);

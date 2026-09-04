@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import type { Stage } from "@/src/domain/types";
+
+const DEFAULT_AGENT_INSTRUCTIONS_PATH = fileURLToPath(new URL("../../AGENTS.md", import.meta.url));
 
 function extractSection(content: string, name: string): string {
   const startMarker = `<!-- BEGIN:${name} -->`;
@@ -12,19 +14,42 @@ function extractSection(content: string, name: string): string {
   return content.slice(start + startMarker.length, end).trim();
 }
 
-// Read fresh each call (not cached) so editing AGENTS.md takes effect on the next
-// run without restarting the worker. eng-work-board's own AGENTS.md is never the
-// agent's cwd for a card (that's always the target repo's worktree), so this is
-// the only way its guidance reaches a run.
-function agentDefaults(stage: Exclude<Stage, "backlog" | "done">): string {
+export function loadAgentContext(input: Readonly<{
+  stage: Exclude<Stage, "backlog" | "done">;
+  path?: string;
+}>): Readonly<{ additionalContext: string; skills: readonly string[] }> {
+  const path = input.path ?? DEFAULT_AGENT_INSTRUCTIONS_PATH;
+  let content: string;
   try {
-    const content = readFileSync(resolve(process.cwd(), "AGENTS.md"), "utf-8");
-    const sections = [extractSection(content, "agent-defaults-all")];
-    if (stage === "planning") sections.push(extractSection(content, "agent-defaults-planning"));
-    return sections.filter(Boolean).join("\n\n");
-  } catch {
-    return "";
+    content = readFileSync(path, "utf-8");
+  } catch (error) {
+    throw new Error(`Cannot start a run: failed to read ${path} for default-skill directives (${error instanceof Error ? error.message : String(error)})`);
   }
+  const sectionNames = input.stage === "planning"
+    ? ["agent-defaults-all", "agent-defaults-planning"]
+    : ["agent-defaults-all"];
+  const sections = sectionNames.map((name) => {
+    const section = extractSection(content, name);
+    if (!section) {
+      throw new Error(`Cannot start a run: ${path} has no ${name} content (missing or empty BEGIN/END markers)`);
+    }
+    return section;
+  });
+  const skills: string[] = [];
+  const instructionSections = sections.map((section) => section
+    .split("\n")
+    .filter((line) => {
+      const skill = line.trim().match(/^\/([a-z0-9][a-z0-9:._-]*)$/i)?.[1];
+      if (!skill) return true;
+      skills.push(skill);
+      return false;
+    })
+    .join("\n")
+    .trim());
+  return {
+    additionalContext: instructionSections.filter(Boolean).join("\n\n"),
+    skills,
+  };
 }
 
 // "outcome" is the one field the app trusts to decide what happens to this run — it
@@ -52,7 +77,6 @@ export function stagePrompt(input: Readonly<{
     building: "Implement the approved plan. Run useful checks. Do not commit, push, tag, or create a PR.",
     review: "Review the uncommitted changes. Do not edit files. Give concrete findings and a verdict.",
   }[input.stage];
-  const defaults = agentDefaults(input.stage);
   const verdictNote = input.stage === "review"
     ? `\nSet "verdict" to a short human-readable summary of your review decision — this is shown to the engineer, not parsed by the app.\n`
     : "";
@@ -64,7 +88,7 @@ export function stagePrompt(input: Readonly<{
       }\n`
     : "";
   return `${task}
-${defaults ? `\n${defaults}\n` : ""}${verdictNote}${buildingNote}
+${verdictNote}${buildingNote}
 Title: ${input.title}
 Description: ${input.body || "No description"}
 Senior engineer notes: ${input.notes || "No notes"}
@@ -83,7 +107,6 @@ export function resumeCheckInPrompt(input: Readonly<{
   itemType: "issue" | "pull_request";
   githubNumber: number;
 }>): string {
-  const defaults = agentDefaults(input.stage);
   const buildingNote = input.stage === "building"
     ? `\nIf the implementation is done, draft "prTitle" and "prDescription" for the pull request this change would become (you do not create the PR yourself).${
         input.itemType === "issue"
@@ -92,7 +115,7 @@ export function resumeCheckInPrompt(input: Readonly<{
       }\n`
     : "";
   return `Check in on this session: report the current status of this ${input.stage} work — do not restart or redo work you already completed.
-${defaults ? `\n${defaults}\n` : ""}${buildingNote}
+${buildingNote}
 Senior engineer notes since you last reported: ${input.notes || "None"}
 
 If the work is genuinely complete, or a question you previously asked has since been resolved (e.g. answered directly in this conversation), report that. Only include a question in "questions" if it is still genuinely unresolved right now.
