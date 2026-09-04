@@ -6,4 +6,4 @@ node_modules/
 *.log
 *.tsbuildinfo
 .eng-work-board/
-.worktree/
+.worktrees/
