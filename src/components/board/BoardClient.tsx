@@ -70,9 +70,19 @@ export function BoardClient() {
     const overCard = board.cards.find((candidate) => candidate.id === event.over?.id);
     const destination = (overCard?.stage ?? event.over.data.current?.stage) as Stage | undefined;
     try {
-      if (destination && destination !== card.stage) await request(`/api/cards/${card.id}/move`, { destination });
-      else if (overCard && overCard.id !== card.id) await request(`/api/cards/${card.id}/order`, { position: overCard.position - 0.5 });
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Move failed"); }
+      if (destination && destination !== card.stage) {
+        setBoard((current) => current ? {
+          ...current,
+          cards: current.cards.map((candidate) => candidate.id === card.id ? { ...candidate, stage: destination } : candidate),
+        } : current);
+        await request(`/api/cards/${card.id}/move`, { destination });
+      } else if (overCard && overCard.id !== card.id) {
+        await request(`/api/cards/${card.id}/order`, { position: overCard.position - 0.5 });
+      }
+    } catch (reason) {
+      await refresh();
+      setError(reason instanceof Error ? reason.message : "Move failed");
+    }
   };
   if (!board && !error) return <section className="loading-panel" aria-live="polite"><p>Loading your board...</p></section>;
   if (!board) return <section className="configuration-panel"><h2>Board unavailable</h2><p>{error}</p><button type="button" onClick={() => void refresh()}>Try again</button></section>;
