@@ -1,6 +1,6 @@
 import { Bot, CircleDot, GitPullRequest, LockKeyhole } from "lucide-react";
 
-import type { WorkCardData } from "@/src/components/board/types";
+import { displayedRunStatus, type WorkCardData } from "@/src/components/board/types";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 
 export function WorkCardPreview({ card }: Readonly<{ card: WorkCardData }>) {
@@ -21,7 +21,7 @@ export function WorkCardPreview({ card }: Readonly<{ card: WorkCardData }>) {
         {card.matchReasons.slice(0, 2).map((reason) => <span key={reason}>{reason.replaceAll("_", " ")}</span>)}
       </div>
       {card.noLongerAssigned ? <p className="card-warning">No longer assigned</p> : null}
-      {activeRun ? <StatusBadge status={activeRun.status} /> : null}
+      {activeRun ? <StatusBadge status={displayedRunStatus(activeRun)} /> : null}
     </article>
   );
 }

@@ -78,7 +78,7 @@ The web server binds to `127.0.0.1`. It is not exposed to other devices on the l
 The normal flow is:
 
 1. Move a card from Backlog to Planning. The selected work agent triages it, suggests a change type, and writes a plan without editing files.
-2. Review the plan, change the suggested type when needed, and add notes.
+2. Review the plan and change the suggested type when needed. Continue the agent session to answer questions or refine the plan.
 3. Move implementation work to Building. The same agent session edits the isolated worktree and runs checks.
 4. Open the worktree in VS Code and inspect the uncommitted changes.
 5. Move the card to Review. The other agent reviews the diff without editing it.
@@ -86,6 +86,14 @@ The normal flow is:
 7. Sync GitHub after the issue or pull request is closed or merged. The card then moves to Done.
 
 Review-only pull requests skip Building.
+
+## Continue a session outside the board
+
+Open a card and select **Copy terminal command** to resume its session with status reporting enabled. If the session is already open in Codex or Claude Code, select **Copy instructions for open session** and send those instructions there instead. Wait for a board run to finish before continuing elsewhere.
+
+The agent reports **Ready**, **Needs input**, **Blocked**, or **Changes requested**, with a short reason. Reports are saved locally, including while the board is closed, and imported when the worker runs. The card shows the last reported outcome and time. This does not track whether an external session is currently running.
+
+Expand **History** entries to see plans, questions, blockers, changed files, checks, and review findings. Old reports remain in history but cannot replace the current run's outcome. Reporting never moves a card to another column.
 
 ## Local data
 

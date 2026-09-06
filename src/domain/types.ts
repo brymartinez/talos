@@ -54,6 +54,7 @@ export const runStateSchema = z.enum([
   "succeeded",
   "failed",
   "needs_input",
+  "blocked",
   "changes_requested",
   "cancelled",
   "interrupted",
@@ -121,6 +122,7 @@ export type RunStatus =
       finishedAt: string;
       questions: readonly string[];
     }>
+  | Readonly<{ kind: "blocked"; finishedAt: string }>
   | Readonly<{ kind: "changes_requested"; finishedAt: string }>
   | Readonly<{ kind: "cancelled"; finishedAt: string }>
   | Readonly<{ kind: "interrupted"; finishedAt: string }>;

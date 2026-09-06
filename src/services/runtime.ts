@@ -10,7 +10,7 @@ export class ServiceError extends Error {
   }
 }
 
-function assertLocalRequest(request: Request): void {
+export function assertLocalRequest(request: Request): void {
   const url = new URL(request.url);
   const localHosts = ["localhost", "127.0.0.1", "[::1]"];
   const hostHeader = request.headers.get("host");
@@ -24,7 +24,8 @@ function assertLocalRequest(request: Request): void {
     throw new ServiceError("local_access_only", "This app only accepts local requests.", 403);
   }
   const origin = request.headers.get("origin");
-  if (origin && origin !== url.origin) {
+  const requestOrigin = new URL(`${url.protocol}//${hostHeader}`).origin;
+  if (origin && origin !== requestOrigin) {
     throw new ServiceError("invalid_origin", "Cross-site requests are not allowed.", 403);
   }
 }

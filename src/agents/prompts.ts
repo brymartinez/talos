@@ -56,11 +56,12 @@ export function loadAgentContext(input: Readonly<{
 // does not re-derive status from "questions" length or parse "verdict" text. Get it
 // wrong and the card lands in the wrong column state.
 const RESULT_FORMAT = `End with exactly one line beginning ENGINEERING_WORK_BOARD_RESULT: followed by JSON matching this exact shape (all fields required, use "" or [] when a section does not apply):
-{"outcome": "succeeded" | "needs_input" | "changes_requested", "summary": string, "changeType": "feat" | "fix" | "refactor" | "perf" | "docs" | "test" | "build" | "ci" | "chore" | null, "blockers": string[], "questions": string[], "plan": {"file": string, "change": string}[], "changedFiles": string[], "checks": {"command": string, "result": string}[], "findings": string[], "verdict": string, "prTitle": string, "prDescription": string}
+{"outcome": "succeeded" | "needs_input" | "blocked" | "changes_requested", "summary": string, "changeType": "feat" | "fix" | "refactor" | "perf" | "docs" | "test" | "build" | "ci" | "chore" | null, "blockers": string[], "questions": string[], "plan": {"file": string, "change": string}[], "changedFiles": string[], "checks": {"command": string, "result": string}[], "findings": string[], "verdict": string, "prTitle": string, "prDescription": string}
 Set "outcome" to exactly one of:
 - "needs_input" — "questions" is non-empty and you need an answer before you can continue.
 - "changes_requested" — this is a review and the changes are not ready to ship yet.
-- "succeeded" — everything else, including a review that is ready to ship.
+- "blocked" — you cannot proceed because a dependency, permission, or required resource is missing.
+- "succeeded" — this stage is complete, including a review that is ready to ship.
 Every findings entry must be a single plain string (e.g. "src/foo.ts:42 missing null check"), not an object. Keep the PR description short.`;
 
 export function stagePrompt(input: Readonly<{

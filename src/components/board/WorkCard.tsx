@@ -5,7 +5,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Bot, CircleDot, Code2, GitPullRequest, LockKeyhole } from "lucide-react";
 
-import type { WorkCardData } from "@/src/components/board/types";
+import { displayedRunStatus, type WorkCardData } from "@/src/components/board/types";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 
 function openVsCode(cardId: string): void {
@@ -39,7 +39,7 @@ export function WorkCard({ card, onOpen }: Readonly<{ card: WorkCardData; onOpen
       </div>
       {card.noLongerAssigned ? <p className="card-warning">No longer assigned</p> : null}
       <div className="card-footer">
-        {activeRun ? <StatusBadge status={activeRun.status} /> : null}
+        {activeRun ? <StatusBadge status={displayedRunStatus(activeRun)} /> : null}
         {canOpenEditor ? (
           <button
             className="card-editor-link"

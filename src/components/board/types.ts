@@ -1,3 +1,4 @@
+import type { SessionReport } from "@/src/agents/session-reports";
 import type { AgentResult } from "@/src/agents/types";
 import type { ChangeType } from "@/src/domain/types";
 
@@ -7,6 +8,7 @@ export type Run = Readonly<{
   summary: string | null; result: AgentResult | null; questions: readonly string[];
   errorMessage: string | null; logUrl: string | null; sessionId: string | null;
   createdAt: string; finishedAt: string | null;
+  reportedOutcome: SessionReport | null; reports: readonly SessionReport[];
 }>;
 export type WorkCardData = Readonly<{
   id: string; stage: Stage; position: number; title: string; body: string; url: string;
@@ -32,3 +34,8 @@ export type BoardData = Readonly<{
     concurrency: number;
   }>;
 }>;
+
+export function displayedRunStatus(run: Run): string {
+  return run.status === "queued" || run.status === "running"
+    ? run.status : run.reportedOutcome?.result.outcome ?? run.status;
+}

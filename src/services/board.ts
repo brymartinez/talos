@@ -1,5 +1,6 @@
 import type { Database } from "@/src/db/sqlite";
 
+import { latestSessionReport, sessionReportHistory } from "@/src/agents/session-reports";
 import { agentResultSchema } from "@/src/agents/types";
 import type { AppConfig } from "@/src/config/env";
 import { changeTypeSchema, matchReasonSchema, runStateSchema, stageSchema, type ChangeType } from "@/src/domain/types";
@@ -50,7 +51,7 @@ export function boardSnapshot(database: Database, config: AppConfig): unknown {
       agent_runs.log_path, agent_runs.error_message, agent_runs.created_at, agent_runs.finished_at,
       agent_sessions.provider_session_id
      FROM agent_runs LEFT JOIN agent_sessions ON agent_sessions.id = agent_runs.session_id
-     ORDER BY agent_runs.created_at DESC`,
+     ORDER BY agent_runs.created_at DESC, agent_runs.rowid DESC`,
   ).all();
   const runsByCard = new Map<string, unknown[]>();
   for (const run of runRows) {
@@ -58,6 +59,7 @@ export function boardSnapshot(database: Database, config: AppConfig): unknown {
     list.push({
       id: run.id, stage: stageSchema.parse(run.stage), provider: run.provider,
       status: runStateSchema.parse(run.status), summary: run.summary,
+      reportedOutcome: latestSessionReport(database, run.id), reports: sessionReportHistory(database, run.id),
       // Runs recorded before "outcome" existed have no such field in their stored JSON;
       // fall back to the status we already derived for them at the time (which the
       // enum's possible values still cover, since a run only ever gets a result_json

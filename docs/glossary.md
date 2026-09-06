@@ -6,11 +6,19 @@ One attempt by Codex or Claude Code to complete the task for a stage.
 
 ## Agent session
 
-A provider conversation that the app can resume. Planning and Building share the work-agent session. Review starts a new session with the other agent.
+A provider conversation that the app can resume. Planning and Building share the work-agent session. Review starts a separate session with the other agent. Retrying a stage resumes its eligible session.
+
+## Outcome
+
+The agent's reported result for the current stage: Ready, Needs input, Blocked, or Changes requested. Ready means that stage's work is complete. An outcome does not say whether the agent is still running.
+
+## Outcome report
+
+A record of an outcome, the agent's reason, and any supporting results. A report belongs to one run and stage. It does not move the card to another stage.
 
 ## Card
 
-The local Kanban record for one GitHub source item. A card stores its stage, manual order, notes, agent choice, run history, and workspace.
+The local Kanban record for one GitHub source item. A card stores its stage, manual order, agent choice, run history, outcome reports, and workspace.
 
 ## Match reason
 

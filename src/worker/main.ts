@@ -1,3 +1,5 @@
+import { join } from "node:path";
+import { importSessionReports } from "@/src/agents/session-reports";
 import { getConfigResult } from "@/src/config/env";
 import { cancelAgentProcess } from "@/src/agents/process";
 import { closeBunDatabases, getBunDatabase } from "@/src/db/client-bun";
@@ -21,12 +23,18 @@ const activeRunIds = new Set<string>();
 const activeJobs = new Map<string, LeasedJob>();
 recoverExpiredJobs(database);
 let lastRecoveryAt = Date.now();
+function collectReports(): void {
+  try { importSessionReports(database, join(config.paths.dataDirectory, "guard-bin")); }
+  catch (error) { console.error("Session report import failed", error); }
+}
+collectReports();
+const reportTimer = setInterval(collectReports, 1_000);
 
 function finishRunAsCancelled(runId: string): void {
   const timestamp = new Date().toISOString();
   database.query<unknown, [string, string, string]>(
     `UPDATE agent_runs SET status = 'cancelled', error_message = NULL, finished_at = ?, updated_at = ?
-     WHERE id = ? AND status IN ('queued', 'running', 'succeeded', 'failed', 'needs_input')`,
+     WHERE id = ? AND status IN ('queued', 'running', 'succeeded', 'failed', 'needs_input', 'blocked', 'changes_requested')`,
   ).run(timestamp, timestamp, runId);
 }
 
@@ -125,5 +133,7 @@ while (!stopping) {
     }
   }));
 }
+clearInterval(reportTimer);
+collectReports();
 closeBunDatabases();
 console.log("Engineering Work Board worker stopped");

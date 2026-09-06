@@ -8,7 +8,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
       {status === "running" ? <Loader2 size={12} className="spin" /> : null}
       {status === "queued" ? <Clock size={12} /> : null}
       {status === "changes_requested" ? <AlertTriangle size={12} /> : null}
-      {status.replaceAll("_", " ")}
+      {status === "succeeded" ? "ready" : status.replaceAll("_", " ")}
     </span>
   );
 }

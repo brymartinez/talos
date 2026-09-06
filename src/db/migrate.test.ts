@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { Database as BunDatabase } from "bun:sqlite";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 describe("database migration", () => {
-  test("runs every pending migration through version 4", () => {
+  test("runs every pending migration through version 5", () => {
     const dataDirectory = mkdtempSync(join(tmpdir(), "eng-work-board-migration-"));
     temporaryDirectories.push(dataDirectory);
     const paths = deriveAppPaths(dataDirectory);
@@ -64,7 +64,7 @@ describe("database migration", () => {
     const version = database.query<Readonly<{ user_version: number }>, []>("PRAGMA user_version").get();
 
     expect(columns.map((column) => column.name)).toContain("change_type");
-    expect(version?.user_version).toBe(4);
+    expect(version?.user_version).toBe(5);
   });
 
   test("adds the card change type to a version 3 database", () => {
@@ -72,7 +72,9 @@ describe("database migration", () => {
     temporaryDirectories.push(dataDirectory);
     const paths = deriveAppPaths(dataDirectory);
     const versionThree = new BunDatabase(paths.databaseFile, { create: true });
-    versionThree.exec("CREATE TABLE cards (id TEXT PRIMARY KEY); PRAGMA user_version = 3;");
+    const schema = readFileSync("src/db/schema.sql", "utf8");
+    versionThree.exec(schema.slice(0, schema.indexOf("CREATE TABLE session_reporters"))
+      .replace(/  change_type TEXT CHECK \(change_type IN \([^\n]+\n/, "") + "PRAGMA user_version = 3;");
     versionThree.close();
     const config = {
       githubToken: "token",

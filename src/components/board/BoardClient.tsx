@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { BoardColumn } from "@/src/components/board/BoardColumn";
 import { FilterBar } from "@/src/components/board/FilterBar";
-import type { BoardData, Stage, WorkCardData } from "@/src/components/board/types";
+import { displayedRunStatus, type BoardData, type Stage, type WorkCardData } from "@/src/components/board/types";
 import { WorkCardPreview } from "@/src/components/board/WorkCardPreview";
 import { CardDrawer } from "@/src/components/card/CardDrawer";
 
@@ -44,12 +44,12 @@ export function BoardClient() {
     });
   }, []);
   const active = board?.syncPending || board?.refresh?.status === "running" || board?.cards.some((card) => ["queued", "running"].includes(card.runs[0]?.status ?? ""));
-  useEffect(() => { if (!active) return; const timer = window.setInterval(() => void refresh(), 2_000); return () => window.clearInterval(timer); }, [active, refresh]);
+  useEffect(() => { const timer = window.setInterval(() => void refresh(), active ? 2_000 : 5_000); return () => window.clearInterval(timer); }, [active, refresh]);
   const visible = useMemo(() => board?.cards.filter((card) =>
     (!repository || card.repository === repository) &&
     (!itemType || card.itemType === itemType) &&
     (!reason || card.matchReasons.includes(reason)) &&
-    (!status || card.runs[0]?.status === status) &&
+    (!status || (card.runs[0] && displayedRunStatus(card.runs[0]) === status)) &&
     (!query || `${card.title} ${card.repository}`.toLowerCase().includes(query.toLowerCase())),
   ) ?? [], [board, itemType, query, reason, repository, status]);
   const repositories = useMemo(() => [...new Set(board?.cards.map((card) => card.repository) ?? [])].sort(), [board]);
@@ -102,7 +102,7 @@ export function BoardClient() {
         </section>
         <DragOverlay>{activeCard ? <WorkCardPreview card={activeCard} /> : null}</DragOverlay>
       </DndContext>
-      {selected ? <CardDrawer key={`${selected.id}:${selected.changeType ?? ""}`} card={selected} onClose={() => setSelectedId(null)} onChanged={() => void refresh()} /> : null}
+      {selected ? <CardDrawer key={selected.id} card={selected} onClose={() => setSelectedId(null)} onChanged={() => void refresh()} /> : null}
     </>
   );
 }

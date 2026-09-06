@@ -646,3 +646,9 @@ textarea:focus-visible {
     flex-direction: column;
   }
 }
+
+.status-blocked { color: #b45309; background: #fffbeb; }
+.run-history details { padding-block: 0.65rem; }
+.run-history summary { cursor: pointer; line-height: 1.6; }
+.run-history small { display: block; margin-top: 0.5rem; color: var(--muted); }
+.run-history h4 { margin-bottom: 0.5rem; }

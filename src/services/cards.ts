@@ -1,6 +1,7 @@
 import type { Database } from "@/src/db/sqlite";
 import { z } from "zod";
 
+import { latestSessionReport } from "@/src/agents/session-reports";
 import { insertQueueJob, moveCardAtomically } from "@/src/db/repositories";
 import { agentProviderSchema, cardIdSchema, changeTypeSchema, newRunId, stageSchema, type Card, type CardId, type ChangeType, type MatchReason, type RunState } from "@/src/domain/types";
 import { canMoveCard, isForwardMove } from "@/src/domain/workflow";
@@ -9,7 +10,7 @@ import { ServiceError } from "@/src/services/runtime";
 type CardRow = Readonly<{
   id: string; item_type: "issue" | "pull_request"; stage: string; position: number;
   notes: string; notes_updated_at: string | null; work_agent: "codex" | "claude";
-  change_type: ChangeType | null;
+  change_type: ChangeType | null; latest_run_id: string | null;
   archived: number; no_longer_assigned: number; active_run_state: RunState | null;
 }>;
 
@@ -17,7 +18,8 @@ function loadCard(database: Database, cardId: CardId): Card {
   const row = database.query<CardRow, [CardId]>(
     `SELECT cards.id, source_items.item_type, cards.stage, cards.position, cards.notes,
       cards.notes_updated_at, cards.work_agent, cards.change_type, cards.archived, cards.no_longer_assigned,
-      (SELECT status FROM agent_runs WHERE card_id = cards.id ORDER BY created_at DESC LIMIT 1) AS active_run_state
+      (SELECT id FROM agent_runs WHERE card_id = cards.id ORDER BY created_at DESC, rowid DESC LIMIT 1) AS latest_run_id,
+      (SELECT status FROM agent_runs WHERE card_id = cards.id ORDER BY created_at DESC, rowid DESC LIMIT 1) AS active_run_state
      FROM cards JOIN source_items ON source_items.id = cards.source_item_id WHERE cards.id = ?`,
   ).get(cardId);
   if (!row) throw new ServiceError("card_not_found", "Card not found.", 404);
@@ -31,7 +33,9 @@ function loadCard(database: Database, cardId: CardId): Card {
     notesUpdatedAt: row.notes_updated_at, workAgent: row.work_agent,
     changeType: changeTypeSchema.nullable().parse(row.change_type),
     archived: row.archived === 1, noLongerAssigned: row.no_longer_assigned === 1,
-    activeRunState: row.active_run_state,
+    activeRunState: row.active_run_state === "queued" || row.active_run_state === "running"
+      ? row.active_run_state
+      : (row.latest_run_id ? latestSessionReport(database, row.latest_run_id)?.result.outcome : null) ?? row.active_run_state,
   };
 }
 

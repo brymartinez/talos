@@ -16,14 +16,14 @@ export function migrateDatabase(database: Database): void {
     if (!version) {
       throw new Error("SQLite did not return PRAGMA user_version");
     }
-    if (version.user_version > 4) {
+    if (version.user_version > 5) {
       throw new Error(`Database version ${version.user_version} is newer than this app supports`);
     }
     let currentVersion = version.user_version;
     if (currentVersion === 0) {
       const schema = readFileSync(join(process.cwd(), "src/db/schema.sql"), "utf8");
       database.exec(schema);
-      currentVersion = 4;
+      currentVersion = 5;
     }
     if (currentVersion === 1) {
       database.exec(`
@@ -88,6 +88,9 @@ export function migrateDatabase(database: Database): void {
         PRAGMA user_version = 4;
       `);
       currentVersion = 4;
+    }
+    if (currentVersion === 4) {
+      database.exec(readFileSync(join(process.cwd(), "src/db/migrations/005-session-reports.sql"), "utf8"));
     }
     database.exec("COMMIT");
   } catch (error) {

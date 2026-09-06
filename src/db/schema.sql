@@ -90,7 +90,7 @@ CREATE TABLE agent_runs (
   session_id TEXT REFERENCES agent_sessions(id) ON DELETE SET NULL,
   stage TEXT NOT NULL CHECK (stage IN ('planning', 'building', 'review')),
   provider TEXT NOT NULL CHECK (provider IN ('codex', 'claude')),
-  status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'needs_input', 'changes_requested', 'cancelled', 'interrupted')),
+  status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'needs_input', 'blocked', 'changes_requested', 'cancelled', 'interrupted')),
   summary TEXT,
   result_json TEXT,
   questions_json TEXT,
@@ -156,4 +156,23 @@ CREATE TABLE refresh_errors (
   created_at TEXT NOT NULL
 );
 
-PRAGMA user_version = 4;
+CREATE TABLE session_reporters (
+  run_id TEXT PRIMARY KEY REFERENCES agent_runs(id) ON DELETE CASCADE,
+  session_id TEXT NOT NULL REFERENCES agent_sessions(id) ON DELETE CASCADE,
+  provider_session_id TEXT,
+  token TEXT NOT NULL
+);
+
+CREATE TABLE session_reports (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+  token TEXT NOT NULL,
+  result_json TEXT NOT NULL,
+  reported_at TEXT NOT NULL,
+  imported_at TEXT NOT NULL,
+  applied INTEGER NOT NULL CHECK (applied IN (0, 1)),
+  ignored_reason TEXT
+);
+CREATE INDEX session_reports_run_time_idx ON session_reports(run_id, reported_at DESC, id DESC);
+
+PRAGMA user_version = 5;

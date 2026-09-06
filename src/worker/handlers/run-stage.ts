@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { ClaudeRunner } from "@/src/agents/claude";
 import { CodexRunner } from "@/src/agents/codex";
+import { prepareSessionReporter, continuationInstructions, bindReporterSession, sessionReportHistory } from "@/src/agents/session-reports";
 import { enforceStagePolicy } from "@/src/agents/policy";
 import { loadAgentContext, resumeCheckInPrompt, stagePrompt } from "@/src/agents/prompts";
 import type { AgentResult, AgentRunner } from "@/src/agents/types";
@@ -83,11 +84,13 @@ export async function handleRunStage(input: Readonly<{
   }
   const provider = stage === "review" ? (context.work_agent === "codex" ? "claude" : "codex") : context.work_agent;
   const selectedRunner = runner(agentProviderSchema.parse(provider));
-  const priorResult = input.database.query<{ result_json: string | null }, [typeof cardId, typeof runId]>(
-    `SELECT result_json FROM agent_runs
-     WHERE card_id = ? AND id <> ? AND result_json IS NOT NULL
-     ORDER BY created_at DESC LIMIT 1`,
-  ).get(cardId, runId)?.result_json ?? undefined;
+  const priorRun = input.database.query<{ id: string; result_json: string | null }, [typeof cardId, typeof runId]>(
+    `SELECT id, result_json FROM agent_runs
+     WHERE card_id = ? AND id <> ?
+     ORDER BY created_at DESC, rowid DESC LIMIT 1`,
+  ).get(cardId, runId);
+  const priorReport = priorRun ? sessionReportHistory(input.database, priorRun.id).find(report => report.applied) : undefined;
+  const priorResult = priorReport ? JSON.stringify(priorReport.result) : priorRun?.result_json ?? undefined;
   const timestamp = new Date().toISOString();
   const priorSession = stage === "building"
     ? input.database.query<PriorSessionRow, [typeof cardId, AgentProvider]>(
@@ -97,15 +100,15 @@ export async function handleRunStage(input: Readonly<{
            AND agent_sessions.provider = ? AND agent_sessions.provider_session_id IS NOT NULL
          ORDER BY agent_runs.created_at DESC LIMIT 1`,
       ).get(cardId, provider)
-    : stage === "planning"
-      ? input.database.query<PriorSessionRow, [typeof cardId, AgentProvider, typeof runId]>(
+    : stage === "planning" || stage === "review"
+      ? input.database.query<PriorSessionRow, [typeof cardId, typeof stage, AgentProvider, typeof runId]>(
           `SELECT agent_sessions.id, agent_sessions.provider_session_id
            FROM agent_runs JOIN agent_sessions ON agent_sessions.id = agent_runs.session_id
-           WHERE agent_runs.card_id = ? AND agent_runs.stage = 'planning'
-             AND agent_runs.status = 'needs_input' AND agent_sessions.provider = ?
+           WHERE agent_runs.card_id = ? AND agent_runs.stage = ?
+             AND agent_runs.status NOT IN ('queued', 'running', 'cancelled', 'interrupted') AND agent_sessions.provider = ?
              AND agent_sessions.provider_session_id IS NOT NULL AND agent_runs.id <> ?
            ORDER BY agent_runs.created_at DESC LIMIT 1`,
-        ).get(cardId, provider, runId)
+        ).get(cardId, stage, provider, runId)
       : null;
   if (stage === "building" && !priorSession) {
     throw new Error("Building requires a successful Planning session from the selected work agent");
@@ -161,6 +164,9 @@ export async function handleRunStage(input: Readonly<{
         itemType: context.item_type,
         githubNumber: context.github_number,
       });
+  const guardDirectory = join(input.config.paths.dataDirectory, "guard-bin");
+  const reporter = prepareSessionReporter({ database: input.database, guardDirectory, runId });
+  const reportingInstructions = continuationInstructions({ stage, command: reporter.command });
   const before = await captureGitState(workspace.worktree_path);
   let result: AgentResult | null = null;
   let providerSessionId: string | null = null;
@@ -169,11 +175,11 @@ export async function handleRunStage(input: Readonly<{
     runId,
     stage,
     cwd: workspace.worktree_path,
-    prompt,
+    prompt: `${prompt}\n\n${reportingInstructions}`,
     additionalContext: agentContext.additionalContext,
     skills: agentContext.skills,
     logPath: join(input.config.paths.logsDirectory, `${runId}.log`),
-    guardDirectory: join(input.config.paths.dataDirectory, "guard-bin"),
+    guardDirectory,
   };
   const events = priorSession
     ? selectedRunner.resume({ ...runInput, sessionId: priorSession.provider_session_id })
@@ -184,6 +190,7 @@ export async function handleRunStage(input: Readonly<{
     ).run(runId, event.kind, JSON.stringify(event), new Date().toISOString());
     if (event.kind === "session" && event.sessionId !== providerSessionId) {
       providerSessionId = event.sessionId;
+      bindReporterSession(input.database, runId, providerSessionId);
       input.database.query<unknown, [string, string, string]>(
         "UPDATE agent_sessions SET provider_session_id = ?, updated_at = ? WHERE id = ?",
       ).run(providerSessionId, new Date().toISOString(), sessionId);
