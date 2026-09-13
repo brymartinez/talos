@@ -84,11 +84,11 @@ function repositoryFixture(): Readonly<{
 }
 
 describe("card workspaces", () => {
-  test("accepts current and saved legacy card worktree paths", () => {
+  test("accepts card paths under .worktrees and rejects legacy or unrelated paths", () => {
     const repositoryPath = "/tmp/repository";
 
     expect(isCardWorktreePath(repositoryPath, "/tmp/repository/.worktrees/42-card")).toBe(true);
-    expect(isCardWorktreePath(repositoryPath, "/tmp/repository/.worktree/42-card")).toBe(true);
+    expect(isCardWorktreePath(repositoryPath, "/tmp/repository/.worktree/42-card")).toBe(false);
     expect(isCardWorktreePath(repositoryPath, "/tmp/repository/other/42-card")).toBe(false);
   });
 
