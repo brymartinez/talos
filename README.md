@@ -1,4 +1,4 @@
-# Engineering Work Board
+# Talos
 
 A local Kanban board for GitHub work. It gathers issues and pull requests that need your attention. Each forward stage move starts a supervised Codex or Claude Code run.
 
